@@ -1,0 +1,190 @@
+/* src/css/ActivityLog.css */
+
+/* ——— Layout (matches Admin Management vibe) ——— */
+.al-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+  background: #f3f4f6;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+/* Sidebar */
+.al-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  background: #ffffff;
+  border-right: 1px solid #e5e7eb;
+  padding: 20px 16px;
+}
+
+.al-sidebar-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #f0fdf4;
+  border: 1px solid #dcfce7;
+  border-radius: 12px;
+}
+
+.al-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #dcfce7;
+  font-size: 20px;
+}
+
+.al-admin-name {
+  font-weight: 600;
+  color: #14532d;
+  line-height: 1.1;
+}
+
+.al-admin-email {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* Sidebar nav */
+.al-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.al-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: #111827;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+
+.al-nav-item:hover {
+  background: #f3f4f6;
+}
+
+.al-nav-item.active {
+  background: #e8f5e9;
+  color: #1b5e20;
+  border: 1px solid #c8e6c9;
+}
+
+.al-nav-ico {
+  width: 22px;
+  display: inline-flex;
+  justify-content: center;
+}
+
+/* Main content shell */
+.al-content {
+  padding: 28px 32px;
+}
+
+/* Topbar */
+.al-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.al-back-btn {
+  background: #e5e7eb;
+  border: 0;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.al-back-btn:hover { background: #d1d5db; }
+
+.al-page-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #14532d;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Card */
+.al-card {
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+  border: 1px solid #e5e7eb;
+}
+
+.al-card-header {
+  padding: 18px 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.al-card-header h2 {
+  font-size: 18px;
+  color: #166534;
+  margin: 0;
+}
+
+/* ——— Existing table styling, kept but refined ——— */
+.activity-log-table-wrapper {
+  overflow-x: auto;
+}
+
+.activity-log-table th {
+  padding: 14px 10px;
+  font-weight: 700;
+  font-size: 16px;
+  color: #388e3c; /* same as AdminManagement */
+  border-bottom: 2px solid #c8e6c9;
+  text-align: left;
+}
+
+
+.activity-log-table thead {
+  background-color: #16a34a;
+  color: white;
+  text-align: left;
+}
+
+.activity-log-table th,
+.activity-log-table td {
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+.activity-log-table tr:hover {
+  background-color: #f9fafb;
+}
+
+.no-logs {
+  text-align: center;
+  font-style: italic;
+  color: #6b7280;
+  padding: 1rem;
+}
+
+/* ——— Responsive ——— */
+@media (max-width: 900px) {
+  .al-layout {
+    grid-template-columns: 1fr;
+  }
+  .al-sidebar {
+    position: relative;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid #e5e7eb;
+  }
+}

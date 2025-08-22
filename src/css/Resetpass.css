@@ -1,0 +1,124 @@
+/* Main container */
+.forgot-container {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  
+  }
+    
+    /* Left Side (exact copy from Login Left Panel) */
+    .forgot-left {
+      position: relative;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      padding: 3rem;
+      text-align: center;
+      z-index: 1;
+    }
+    
+    .forgot-left::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: url("../images/multibg.png"); /* Same background */
+      background-size: cover;
+      background-position: center;
+      opacity: 1.0; /* full background visible */
+      z-index: -2;
+    }
+    
+    .forgot-left::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-color: rgba(22, 101, 52, 0.2); /* green overlay */
+      z-index: -1;
+    }
+    
+    /* Logo inside left */
+    .forgot-logo {
+      width: 320px; /* ✅ same size ng logo sa Login */
+      height: 320px;
+      margin-bottom: -5rem;
+      margin-top: -10rem;
+    }
+    
+    /* Title (CommuniSafe) */
+    .forgot-title {
+      font-size: 3rem; /* same as text-5xl */
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+    
+    /* Description (subtitle) */
+    .forgot-description {
+      font-size: 1.25rem; /* text-xl */
+      max-width: 28rem; /* max-w-md */
+      line-height: 1.75rem; /* leading-relaxed */
+    }
+    
+    /* Right side */
+    .forgot-right {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      padding: 40px;
+    }
+    
+    .forgot-form {
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    
+    .forgot-form h2 {
+      margin-bottom: 10px;
+      font-size: 32px;
+      font-weight: bold;
+      color: #222;
+    }
+    
+    .instruction {
+      margin-bottom: 25px;
+      font-size: 16px;
+      color: #555;
+    }
+    
+    .forgot-input {
+      width: 100%;
+      padding: 12px 15px;
+      margin-bottom: 20px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+    
+    .forgot-button {
+      width: 100%;
+      padding: 12px;
+      background-color: #28a745;
+      color: white;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    
+    .forgot-button:hover {
+      background-color: #218838;
+    }
+    
+    .forgot-message {
+      margin-top: 10px;
+      color: #dc3545;
+      font-weight: bold;
+    }
+    

@@ -1,0 +1,61 @@
+.login-left-panel {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  padding: 11.6rem; /* Correct place to pad your CONTENT */
+  text-align: center;
+  z-index: 1;
+}
+
+.login-left-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("../images/multibg.png"); /* background */
+  background-size: cover;
+  background-position: center;
+  opacity: 1.0;
+  z-index: -2;
+  /* ❌ REMOVE THIS: padding: 100px; */
+}
+
+.login-left-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: rgba(22, 101, 52, 0.2);
+  z-index: -1;
+}
+
+.village-icon {
+  width: 320px;
+  height: 320px;
+  margin-bottom: -5rem;
+  margin-top: -10rem;
+}
+
+.login-title {
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.login-description {
+  font-size: 1.25rem;
+  max-width: 28rem;
+  line-height: 1.75rem;
+}
+
+.login-left-container {
+  flex: 1;
+  position: relative;
+  background-image: url("../images/multibg.png");
+  background-size: cover;
+  background-position: center;
+ 
+}

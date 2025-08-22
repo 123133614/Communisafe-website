@@ -1,0 +1,44 @@
+.ua-root { display:flex; min-height:100vh; background:#f8fafb; }
+.ua-main { flex:1; background:#f8fafb; }
+
+.ua-header{ display:flex; justify-content:space-between; align-items:center; padding:32px 48px 0; }
+.ua-app-title{ font-size:32px; font-weight:700; color:#4caf50; margin:0; letter-spacing:1px; }
+.ua-page-title{ font-size:24px; font-weight:700; color:#388e3c; margin-top:8px; }
+
+.ua-header-actions{ display:flex; align-items:center; gap:18px; }
+.ua-search{ display:flex; align-items:center; background:#fff; border-radius:8px; padding:6px 16px; box-shadow:0 1px 4px #0001; }
+.ua-search input{ border:none; outline:none; margin-left:8px; font-size:16px; background:none; }
+.ua-search-ico{ font-size:20px; color:#888; }
+
+.ua-filter{ display:flex; justify-content:flex-end; padding:16px 48px 0; }
+.ua-filter-box{ display:flex; align-items:center; background:#fff; border-radius:8px; padding:6px 16px; box-shadow:0 1px 4px #0001; }
+.ua-filter-ico{ font-size:20px; color:#888; }
+.ua-filter select{ border:none; outline:none; margin-left:8px; font-size:16px; background:none; }
+
+.ua-card{ margin:32px 48px; background:#fff; border-radius:18px; box-shadow:0 2px 12px #0001; padding:32px; }
+.ua-card-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+.ua-card-title{ font-weight:700; font-size:22px; color:#444; }
+
+.ua-table-wrap{ width:100%; overflow:auto; }
+.ua-table{ width:100%; border-collapse:collapse; background:#fff; }
+.ua-table thead tr{ background:#e8f5e9; }
+.ua-table th{ padding:14px 10px; font-weight:700; font-size:16px; color:#388e3c; border-bottom:2px solid #c8e6c9; text-align:left; }
+.ua-table td{ padding:12px 10px; font-size:15px; color:#444; border-bottom:1px solid #eee; }
+
+.ua-id{ width:48px; height:48px; object-fit:cover; border-radius:6px; border:1px solid #ccc; box-shadow:0 2px 8px #0001; }
+.ua-muted{ color:#aaa; }
+.ua-empty{ text-align:center; padding:24px; color:#aaa; }
+.ua-loading{ padding:32px; text-align:center; }
+
+.ua-role{ padding:4px 8px; border-radius:6px; color:#fff; text-transform:capitalize; font-size:.85rem; }
+.ua-role.official{ background:#1e88e5; }
+.ua-role.resident{ background:#43a047; }
+.ua-role.security{ background:#fbc02d; color:#111; }
+
+.ua-status{ padding:4px 8px; border-radius:6px; text-transform:capitalize; font-size:.85rem; color:#fff; }
+.ua-status.active{ background:#43a047; }
+.ua-status.pending{ background:#f39c12; }
+.ua-status.rejected{ background:#e74c3c; }
+
+.ua-btn{ border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:.9rem; }
+.ua-btn-light{ background:#eef3ef; }

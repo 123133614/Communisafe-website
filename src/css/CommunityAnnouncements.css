@@ -1,0 +1,388 @@
+/* src/css/CommunityAnnouncements.css */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+
+/* ─── Overall Container ─────────────────────────────────────────────────── */
+.dashboard-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #f9fafb;
+  font-family: 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* ─── Top Bar ───────────────────────────────────────────────────────────── */
+.topbar-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  position: relative;
+  z-index: 10;
+}
+
+.topbar-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #16a34a;
+  font-family: 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.search-input, .category-select {
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  outline: none;
+  font-size: 1rem;
+  margin-left: 0.5rem;
+}
+
+.search-input:focus, .category-select:focus {
+  border-color: #16a34a;
+  box-shadow: 0 0 0 2px rgba(22,163,74,0.2);
+}
+
+/* ─── Sidebar ───────────────────────────────────────────────────────────── */
+/* === Sidebar like Flood Tracker (appr-*) =============================== */
+.appr-container{
+  display:grid;
+  grid-template-columns:280px 1fr;
+  min-height:100vh;
+  background:#f8fafb;
+}
+
+.appr-sidebar{
+  position:sticky;
+  top:0;
+  height:100vh;
+  background:linear-gradient(180deg,#b9f6ca 0%, #a5d6a7 100%);
+  background-repeat:no-repeat;
+  background-size:cover;
+  background-position:center top;
+  padding:20px 16px;
+  box-shadow:2px 0 16px rgba(0,0,0,.05);
+}
+
+.appr-sidebar-nav{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  margin-top:220px; /* keep same spacing as your screenshot */
+}
+
+.appr-sidebar-link{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  padding:12px 16px;
+  border-radius:10px;
+  color:#1b5e20;
+  font-weight:600;
+  font-size:14px;
+  cursor:pointer;
+  transition:background .15s ease;
+  line-height:1.4;
+}
+.appr-sidebar-link:hover{ background:rgba(255,255,255,.6); }
+.appr-active{ background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+
+.appr-sidebar-icon{ width:20px; height:20px; flex-shrink:0; margin-top:2px; }
+.appr-sidebar-link span{ flex:1; word-wrap:break-word; white-space:normal; }
+
+/* main area container for pages using appr- layout */
+.appr-main{
+  padding:24px 32px 40px;
+}
+
+/* responsive collapse to icon-only */
+@media (max-width:980px){
+  .appr-container{ grid-template-columns:80px 1fr; }
+  .appr-sidebar-link span{ display:none; }
+  .appr-sidebar-nav{ margin-top:10px; }
+}
+@media (max-width:640px){
+  .appr-main{ padding:16px; }
+}
+
+/* === END appr-* styles ================================================= */
+
+.active-link { background: #e6ffed; color: #16a34a; }
+.active-link .sidebar-icon { color: #16a34a; }
+
+/* ─── Main Content ──────────────────────────────────────────────────────── */
+.dashboard-main {
+  flex: 1;
+  padding: 2rem 2rem 2rem 2.5rem;
+  margin-left: 16rem;
+  transition: margin-left 0.3s;
+}
+.error-banner {
+  background: #fee2e2; border:1px solid #fca5a5;
+  color: #b91c1c; padding:0.75rem 1rem; border-radius:0.375rem;
+  margin-bottom:1rem; text-align:center;
+}
+.btn-post {
+  background: #16a34a;
+  color: #fff;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: background 0.2s;
+  margin-top: 1.25rem; /* ← Add this */
+}
+.btn-post:hover { background:#15803d; }
+.announcements-list {
+  display:flex; flex-direction:column; gap:2rem; margin-top:1.5rem;
+}
+.announcement-horizontal-card {
+  display:flex; background:#fff; border-radius:18px;
+  box-shadow:0 2px 8px rgba(60,60,60,0.08); overflow:hidden;
+  min-height:170px; max-width:700px; margin:0 auto; cursor:pointer;
+  border:3px solid #388e3c; transition:box-shadow 0.2s,border 0.2s;
+}
+.announcement-horizontal-img {
+  flex:0 0 170px; background:#f5f5f5;
+  display:flex; align-items:center; justify-content:center;
+}
+.announcement-img-el {
+  width:100%; height:170px; object-fit:cover;
+  border-radius:12px 0 0 12px; background:#fff;
+}
+.announcement-horizontal-content {
+  flex:1; padding:24px; display:flex; flex-direction:column; justify-content:center;
+}
+.announcement-horizontal-title {
+  font-size:1.25rem; font-weight:700; color:#222; margin-bottom:0.2rem;
+}
+.announcement-horizontal-desc {
+  font-size:1rem; color:#444; margin-bottom:1rem; min-height:2.2rem;
+}
+.announcement-horizontal-meta {
+  font-size:0.98rem; color:#388e3c; font-weight:600;
+  margin-top:auto; display:flex; align-items:center; gap:0.625rem;
+}
+
+/* ─── Details Modal ───────────────────────────────────────────────────── */
+.modal-details-container {
+  background:#fff; padding:1.5rem; border-radius:0.5rem;
+  max-width:600px; width:90%;
+}
+.modal-close-btn {
+  position:absolute; top:1rem; right:1rem;
+  background:transparent; border:none; font-size:2rem;
+  cursor:pointer;
+}
+.modal-title { font-size:1.5rem; margin-bottom:0.5rem; }
+.modal-category { font-weight:bold; margin-bottom:1rem; }
+.modal-description { margin-bottom:1rem; }
+.modal-image {
+  max-width:100%; border-radius:0.375rem; margin-bottom:1rem;
+}
+.modal-timestamp { font-size:0.875rem; color:#6b7280; }
+/* ensure details is under the create form */
+.fixed.inset-0 { z-index:50; }
+
+/* ─── Create Form Overlay ─────────────────────────────────────────────── */
+.modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.5);
+  display:flex; align-items:center; justify-content:center;
+  z-index:60;
+}
+.modal-content.large {
+  background:#fff; border-radius:0.5rem; padding:1.5rem;
+  max-width:600px; width:90%; z-index:61;
+}
+
+/* ─── Global Loading Overlay ─────────────────────────────────────────── */
+/* ─── Modal Details Landscape ─────────────────────────────────────────── */
+/* Modal Details */
+/* ─── Main Modal Design ───────────────────────────────────────────────── */
+/* ─── Modal Details ─────────────────────────────────────────────────── */
+.modal-details-container {
+  background: #fff;
+  padding: 1rem;
+  border-radius: 12px;
+  max-width: 700px; /* Reduced size */
+  width: 90%;
+  max-height: 80vh; /* Limit modal height */
+  overflow-y: auto; /* Enable scrolling for content */
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Title */
+.modal-title {
+  font-size: 1.25rem; /* Slightly smaller title */
+  font-weight: bold;
+  color: #047857;
+  margin-bottom: 0.5rem;
+}
+
+/* Description */
+.modal-description {
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+/* Image Styling */
+.modal-image-side img {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  object-position: center;
+  background-color: #f9fafb;
+  padding: 10px;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+}
+
+/* ─── Comments Section ───────────────────────────────────────────────── */
+.comments-section {
+  max-height: 300px; /* Scrollable area for comments */
+  overflow-y: auto; /* Scrollable content */
+  padding-right: 1rem;
+}
+
+.comments-list {
+  max-height: 200px;
+  overflow-y: auto; /* Make the list scrollable */
+}
+
+/* Textarea Styling */
+textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+  border: 1px solid #e0e0e0;
+  margin-bottom: 1rem;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  background-color: #16a34a;
+  color: white;
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #15803d;
+}
+
+button:disabled {
+  background-color: #d1d5db;
+  cursor: not-allowed;
+}
+
+
+/* Responsive Image */
+.modal-image-side img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  background-color: #f9fafb;
+  padding: 10px;
+}
+
+/* Title and Description Adjustments */
+.modal-title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #047857;
+  margin-bottom: 0.5rem;
+}
+
+.modal-description {
+  margin-top: 10px;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+  color: #333;
+  overflow-y: auto;
+}
+
+/* Adjust button styling for responsiveness */
+.modal-actions button {
+  min-width: 80px;
+  padding: 8px 16px;
+  font-size: 1rem;
+}
+
+.modal-close-btn {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 1.8rem;
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+}
+
+.modal-close-btn:hover {
+  color: #000;
+}
+
+/* Adjust other inputs (Title, Category, Date etc.) */
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  border-radius: 0.375rem;
+  border: 1px solid #e0e0e0;
+  box-sizing: border-box;
+}
+
+/* For smaller screens */
+@media (max-width: 640px) {
+  .modal-details-container {
+    flex-direction: column;
+    padding: 15px;
+  }
+
+  .modal-image-side {
+    width: 100%;
+    margin-bottom: 15px;
+  }
+
+  .modal-content-side {
+    flex: 1;
+  }
+}
+
+
+.topbar-title, .dashboard-main h2, .dashboard-main h3, .dashboard-main h1 {
+  font-family: 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+/* === Make topbar flush with the sidebar & top =================== */
+.appr-main{
+  /* remove top & left padding so the topbar hugs the edges */
+  padding: 0;
+}
+
+/* keep the topbar full‑width, no radius, no extra spacing */
+.appr-main > .topbar-container{
+  margin: 0;
+  border-radius: 0;
+  position: sticky;   /* optional: stays visible on scroll */
+  top: 0;
+  z-index: 20;
+}
+
+/* put the original page padding BACK for the content below topbar */
+.appr-content{
+  padding: 24px 32px 40px;
+}
+
+/* keep responsiveness the same */
+@media (max-width:640px){
+  .appr-content{ padding:16px; }
+}

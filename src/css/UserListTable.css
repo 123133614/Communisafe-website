@@ -1,0 +1,28 @@
+/* src/pages/UserListTable.css */
+.ulist-wrap { background:#fff; border-radius:12px; padding:16px; box-shadow:0 2px 10px rgba(0,0,0,.04); }
+.ulist-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.ulist-search { border:1px solid #e5e7eb; border-radius:8px; padding:8px 10px; width:260px; }
+
+.ulist-table-scroll { overflow:auto; }
+.ulist-table { width:100%; border-collapse:collapse; }
+.ulist-table th, .ulist-table td { padding:12px 10px; border-bottom:1px solid #f0f0f0; text-align:left; }
+.ulist-table th { font-weight:700; color:#388e3c; border-bottom:2px solid #c8e6c9; }
+
+.btn { background:#e0e0e0; border:none; border-radius:6px; padding:6px 12px; cursor:pointer; }
+.btn-green { background:#4caf50; color:#fff; }
+.btn-red { background:#ef5350; color:#fff; }
+
+.ulist-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center; z-index:3000; }
+.ulist-modal { width:min(920px, 92vw); background:#fff; border-radius:14px; overflow:hidden; }
+.ulist-modal-body { display:grid; grid-template-columns: 1.2fr 1fr; gap:20px; padding:24px; }
+.ulist-modal-footer { padding:12px 16px; border-top:1px solid #f0f0f0; display:flex; justify-content:flex-end; }
+
+.ulist-left { min-height:320px; display:flex; flex-direction:column; align-items:center; }
+.ulist-id-img { width:100%; height:420px; object-fit:contain; border-radius:8px; background:#fafafa; border:1px solid #eee; }
+.ulist-openlink { margin-top:8px; font-size:14px; color:#1e88e5; }
+.ulist-noimg { width:100%; height:420px; display:flex; align-items:center; justify-content:center; color:#888; background:#fafafa; border:1px dashed #ddd; border-radius:8px; }
+
+@media (max-width: 720px) {
+  .ulist-modal-body { grid-template-columns: 1fr; }
+  .ulist-id-img, .ulist-noimg { height:300px; }
+}

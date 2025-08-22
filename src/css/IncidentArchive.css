@@ -1,0 +1,366 @@
+/* ===================== Incident Archive Styles ===================== */
+
+/* Page Container */
+.incident-container {
+  display: flex;
+  min-height: 100vh;
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Sidebar Navigation */
+.sidebar {
+  width: 260px;
+  min-height: 100vh;
+  color: #fff;
+  padding: 20px;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.08);
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  margin-top: 220px;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.sidebar-link:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.sidebar-link.active-link {
+  background-color: rgba(255, 255, 255, 0.3);
+  font-weight: 600;
+}
+
+/* Main Content */
+.ia-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.ia-page-title {
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: #16a34a;
+}
+
+.ia-search-input {
+  padding: 8px 14px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.ia-search-input:focus {
+  border-color: #16a34a;
+}
+
+/* Card Container */
+.ia-card {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.06);
+  padding: 16px;
+}
+
+/* Table */
+.ia-table-wrap {
+  overflow-x: auto;
+}
+
+.ia-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.ia-table th {
+  background-color: #16a34a;
+  color: #fff;
+  text-align: left;
+  padding: 12px;
+  font-weight: 600;
+}
+
+.ia-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.ia-table tr:hover {
+  background-color: #f5fdf7;
+}
+
+/* Status & Role Labels */
+.ia-role {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background-color: #e0f2f1;
+  color: #00695c;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.ia-status {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.ia-status-resolved {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.ia-id {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.ia-muted {
+  color: #888;
+  font-style: italic;
+}
+
+.ia-empty {
+  text-align: center;
+  padding: 20px;
+  color: #999;
+  font-style: italic;
+}
+
+/* View Button */
+.ia-btn {
+  background-color: #16a34a;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.ia-btn:hover {
+  background-color: #15803d;
+}
+
+/* ===================== Modal Styles ===================== */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  width: 500px;
+  max-width: 90%;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  animation: fadeInUp 0.3s ease;
+}
+
+.modal-title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #16a34a;
+}
+
+.modal-details p {
+  margin: 6px 0;
+  line-height: 1.4;
+}
+
+.btn-close-modal {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 8px 14px;
+  background: #16a34a;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-close-modal:hover {
+  background: #15803d;
+}
+
+@keyframes fadeInUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+/* ===================== Improved Modal ===================== */
+/* Reuse your .modal-backdrop. We override the content with .ia-modal */
+.ia-modal {
+  width: min(96vw, 820px);         /* bigger but safe on small screens */
+  max-height: 90vh;                /* scroll inside if content is tall */
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(0,0,0,.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;                /* clip inner edges */
+}
+
+/* Header */
+.ia-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid #eef2f3;
+  background: linear-gradient(180deg, #ffffff, #fbfffd);
+}
+.ia-modal-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #16a34a;
+}
+.ia-modal-subtitle {
+  font-size: .875rem;
+  color: #6b7280;
+  margin-top: 2px;
+}
+.ia-modal-x {
+  background: none;
+  border: none;
+  font-size: 28px;
+  line-height: 1;
+  color: #6b7280;
+  cursor: pointer;
+}
+.ia-modal-x:hover { color: #ef4444; }
+
+/* Body layout */
+.ia-modal-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;   /* details | photos */
+  gap: 22px;
+  padding: 18px 22px;
+}
+
+/* Details column */
+.ia-modal-details dl {
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+.ia-modal-details .row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.ia-modal-details dt {
+  font-weight: 700;
+  color: #374151;
+}
+.ia-modal-details dd {
+  margin: 0;
+  color: #1f2937;
+  line-height: 1.45;
+}
+.ia-modal-details .badge {
+  display: inline-block;
+  background: #d1fae5;
+  color: #065f46;
+  font-weight: 700;
+  font-size: .82rem;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+
+/* Photos column */
+.ia-modal-photos .section-title {
+  font-weight: 700;
+  color: #374151;
+  margin-bottom: 10px;
+}
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* bigger thumbs than before */
+  gap: 10px;
+}
+.photo-link { display: block; }
+.photo-grid img {
+  width: 100%;
+  aspect-ratio: 4 / 3;          /* consistent tiles */
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  transition: transform .15s ease;
+}
+.photo-grid img:hover { transform: scale(1.02); }
+.empty-photos { color: #9ca3af; font-style: italic; }
+
+/* Footer */
+.ia-modal-footer {
+  padding: 14px 22px 18px;
+  border-top: 1px solid #eef2f3;
+  background: #fff;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Responsiveness */
+@media (max-width: 900px) {
+  .ia-modal-body {
+    grid-template-columns: 1fr; /* stack: details then photos */
+  }
+  .photo-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 520px) {
+  .ia-modal {
+    width: 96vw;
+    border-radius: 12px;
+  }
+  .ia-modal-details .row {
+    grid-template-columns: 100px 1fr; /* tighter labels */
+  }
+  .photo-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-height: 640px) {
+  .ia-modal { max-height: 88dvh; } /* handle short screens */
+}
