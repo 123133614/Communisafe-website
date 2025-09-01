@@ -18,7 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "../css/IncidentReport.css";
-import io from "socket.io-client";
+import { io } from 'socket.io-client';
 
 
 
@@ -27,14 +27,21 @@ const API_URL =
 
   axios.defaults.baseURL = API_URL;
 
-  export const photoUrlFromKey = (key) =>
-    key
-  ? `${API_URL}/api/files/signed-url?key=${encodeURIComponent(key)}`
-  : `${process.env.PUBLIC_URL}/assets/multiico.png`;
+export const photoUrlFromKey = (key, expires = 600) => {
+  const fallback = `${process.env.PUBLIC_URL}/assets/multiico.png`;
+  if (!key) return fallback;
+
+  const s = String(key).trim();
+  if (/^https?:\/\//i.test(s)) return s;                          // already a URL
+  if (s.startsWith('/uploads/')) return `${API_URL}${s}`;          // legacy absolute
+  if (s.startsWith('uploads/'))  return `${API_URL}/${s}`;         // legacy relative
+  return `${API_URL}/api/files/signed-url-redirect?key=${encodeURIComponent(s)}&expires=${expires}`;
+};
 
 
 
-const socket = io(API_URL, { transports: ["websocket"] });
+const socket = io(API_URL, { transports: ['websocket'], path: '/socket.io/' });
+
 
 // ─── Fix Leaflet marker icon paths ────────────────────────────────────────
 delete L.Icon.Default.prototype._getIconUrl;
@@ -294,6 +301,35 @@ export default function IncidentReport() {
   const [incident, setIncident] = useState(null);
   const [loading, setLoading] = useState(true);
   const [chatModal, setChatModal] = useState({ open: false, incident: null });
+  // add with your other useState hooks
+// add with your other useState/useEffect
+const [activeIdx, setActiveIdx] = useState(0);
+const [imgLoaded, setImgLoaded] = useState(true);
+
+useEffect(() => {
+  if (previewModal?._id) {
+    setActiveIdx(0);
+    setImgLoaded(false);
+  }
+}, [previewModal?._id]);
+
+const handleNextPhoto = (e) => {
+  e?.stopPropagation?.();
+  const arr = Array.isArray(previewModal?.photos) ? previewModal.photos : [];
+  if (!arr.length) return;
+  setImgLoaded(false);
+  setActiveIdx((i) => (i + 1) % arr.length);
+};
+
+// keyboard: ArrowRight = next
+useEffect(() => {
+  if (!previewModal) return;
+  const onKey = (e) => { if (e.key === 'ArrowRight') handleNextPhoto(); };
+  document.addEventListener('keydown', onKey);
+  return () => document.removeEventListener('keydown', onKey);
+}, [previewModal, handleNextPhoto]);
+
+
 
   const [formData, setFormData] = useState({
     name: "",
@@ -536,7 +572,7 @@ export default function IncidentReport() {
         {/* Report Incident Modal */}
         {showModal && (
           <div className="modal-backdrop">
-            <div className="modal-content" style={{ maxWidth: "40rem", padding: "1.5rem" }}>
+            <div className="modal-content w-[95vw] max-w-[640px] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
               <div className="flex justify-between items-center border-b pb-2 mb-4">
                 <h2 className="text-lg font-semibold text-green-700">Report Issue</h2>
                 <button onClick={() => setShowModal(false)} className="text-gray-500 text-xl">×</button>
@@ -617,81 +653,142 @@ export default function IncidentReport() {
         {/* Preview Modal */}
         {previewModal && (
           <div
-            className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center"
+            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-6"
             onClick={() => setPreviewModal(null)}
           >
             <div
-              className="flex bg-white rounded-lg shadow-lg overflow-hidden max-w-4xl w-full preview-modal"
-              onClick={(e) => e.stopPropagation()}
-              style={{ minHeight: "400px" }}
+  className="bg-white rounded-2xl shadow-2xl overflow-hidden w-[95vw] max-w-4xl max-h-[90vh] grid grid-cols-1 md:grid-cols-2"
+  onClick={(e) => e.stopPropagation()}
+  style={{ minHeight: 420 }}
+>
+  {/* LEFT: Image viewer */}
+  <div className="relative bg-neutral-900 md:min-h-[420px] flex items-center justify-center">
+    {/* skeleton shimmer while loading */}
+    {!imgLoaded && (
+      <div className="absolute inset-0 animate-pulse bg-neutral-800" />
+    )}
+
+    {/* fade image in/out */}
+    <motion.img
+      key={`${previewModal?._id}-${activeIdx}`}
+      initial={{ opacity: 0.2, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.25 }}
+      onLoad={() => setImgLoaded(true)}
+      onError={(e) => {
+        e.currentTarget.src = `${process.env.PUBLIC_URL}/assets/multiico.png`;
+        setImgLoaded(true);
+      }}
+      src={photoUrlFromKey(
+        Array.isArray(previewModal?.photos) && previewModal.photos.length
+          ? previewModal.photos[Math.min(activeIdx, previewModal.photos.length - 1)]
+          : null
+      )}
+      alt="Incident"
+      className="object-contain w-full h-full select-none cursor-pointer"
+      title="Click image or press → to view next"
+      onClick={handleNextPhoto}
+    />
+
+    {/* subtle gradient bottom bar */}
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 to-transparent" />
+
+    {/* Counter badge */}
+    {Array.isArray(previewModal?.photos) && previewModal.photos.length > 1 && (
+      <span className="absolute bottom-3 left-3 bg-black/70 text-white text-xs px-2 py-0.5 rounded-full">
+        {activeIdx + 1}/{previewModal.photos.length}
+      </span>
+    )}
+
+    {/* Single “Next ›” button */}
+    {Array.isArray(previewModal?.photos) && previewModal.photos.length > 1 && (
+      <button
+        type="button"
+        aria-label="Next photo"
+        onClick={handleNextPhoto}
+        className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/70 text-white
+                   w-11 h-11 rounded-full text-xl leading-[44px] text-center
+                   hover:bg-black/80 focus:outline-none"
+      >
+        ›
+      </button>
+    )}
+  </div>
+
+  {/* RIGHT: Details */}
+  <div className="p-5 sm:p-6 flex flex-col overflow-y-auto">
+    <h2 className="text-2xl font-semibold text-emerald-700 mb-2">{previewModal.type}</h2>
+
+    <dl className="text-sm text-gray-700 space-y-2 mb-4">
+      <div className="flex">
+        <dt className="w-24 shrink-0 text-gray-500">Location:</dt>
+        <dd className="font-medium">{previewModal.location}</dd>
+      </div>
+      <div className="flex">
+        <dt className="w-24 shrink-0 text-gray-500">Date:</dt>
+        <dd className="font-medium">{previewModal.date}</dd>
+      </div>
+      <div>
+        <dt className="text-gray-500 mb-1">Description:</dt>
+        <dd className="bg-gray-50 rounded-md p-3 text-gray-800">
+          {previewModal.description}
+        </dd>
+      </div>
+    </dl>
+
+    <div className="mt-auto flex flex-wrap gap-2 justify-end">
+      <button
+        className="bg-blue-600 text-white px-4 py-1.5 rounded-full hover:bg-blue-700"
+        onClick={() => setChatModal({ open: true, incident: previewModal })}
+      >
+        Chat
+      </button>
+
+      {previewModal.status?.toLowerCase() !== "solved" &&
+        previewModal.status?.toLowerCase() !== "resolved" && (
+          <>
+            <button
+              className={`bg-amber-500 text-white px-4 py-1.5 rounded-full hover:bg-amber-600 ${
+                respondingId === previewModal._id || previewModal.status?.toLowerCase() === "responding"
+                  ? "opacity-60 cursor-not-allowed"
+                  : ""
+              }`}
+              disabled={respondingId === previewModal._id || previewModal.status?.toLowerCase() === "responding"}
+              onClick={async () => {
+                setRespondingId(previewModal._id);
+                try {
+                  const token = localStorage.getItem("token");
+                  await axios.put(
+                    `${API_URL}/api/incidents/${previewModal._id}/respond`,
+                    { status: "responding" },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                  );
+                  setIncidents((prev) =>
+                    prev.map((inc) => (inc._id === previewModal._id ? { ...inc, status: "responding" } : inc))
+                  );
+                  alert("You are now responding to this incident!");
+                } catch {
+                  alert("Failed to respond to incident.");
+                } finally {
+                  setRespondingId(null);
+                }
+              }}
             >
-              <div className="preview-left w-full md:w-1/2 bg-gray-100 flex items-center justify-center">
-                <img src={photoUrlFromKey(previewModal?.photos?.[0])}
-                alt="Incident" onError={(e) => { e.currentTarget.src = `${process.env.PUBLIC_URL}/assets/multiico.png`; }}
-                className="object-cover w-full h-full"/>
-              </div>
+              Respond
+            </button>
 
-             <div className="preview-right w-full md:w-1/2 p-6 flex flex-col">
-                <h2 className="text-xl font-bold text-green-700 mb-2">{previewModal.type}</h2>
-                <p className="text-sm text-gray-600 mb-2">
-                  <strong>Location:</strong> {previewModal.location}
-                </p>
-                <p className="text-sm text-gray-600 mb-2">
-                  <strong>Date:</strong> {previewModal.date}
-                </p>
-                <p className="text-sm text-gray-600 mb-4">
-                  <strong>Description:</strong>
-                  <br />
-                  {previewModal.description}
-                </p>
+            <button
+              className="bg-emerald-600 text-white px-4 py-1.5 rounded-full hover:bg-emerald-700"
+              onClick={() => handleMarkAsSolved(previewModal._id)}
+            >
+              Mark as Solved
+            </button>
+          </>
+        )}
+    </div>
+  </div>
+</div>
 
-                <div className="mt-auto flex flex-wrap gap-2 justify-end">
-                  <button className="bg-blue-600 text-white px-4 py-1 rounded" onClick={() => setChatModal({ open: true, incident: previewModal })}>
-                    Chat
-                  </button>
-
-                  {previewModal.status?.toLowerCase() !== "solved" &&
-                    previewModal.status?.toLowerCase() !== "resolved" && (
-                      <button
-                        className={`bg-yellow-500 text-white px-4 py-1 rounded ${
-                          respondingId === previewModal._id || previewModal.status?.toLowerCase() === "responding"
-                            ? "opacity-50 cursor-not-allowed"
-                            : ""
-                        }`}
-                        disabled={respondingId === previewModal._id || previewModal.status?.toLowerCase() === "responding"}
-                        onClick={async () => {
-                          setRespondingId(previewModal._id);
-                          try {
-                            const token = localStorage.getItem("token");
-                            await axios.put(
-                              `${API_URL}/api/incidents/${previewModal._id}/respond`,
-                              { status: "responding" },
-                              { headers: { Authorization: `Bearer ${token}` } }
-                            );
-                            setIncidents((prev) =>
-                              prev.map((inc) => (inc._id === previewModal._id ? { ...inc, status: "responding" } : inc))
-                            );
-                            alert("You are now responding to this incident!");
-                          } catch {
-                            alert("Failed to respond to incident.");
-                          } finally {
-                            setRespondingId(null);
-                          }
-                        }}
-                      >
-                        {respondingId === previewModal._id ? "Responding..." : "Respond"}
-                      </button>
-                    )}
-
-                  {previewModal.status?.toLowerCase() !== "solved" &&
-                    previewModal.status?.toLowerCase() !== "resolved" && (
-                      <button className="bg-green-600 text-white px-4 py-1 rounded" onClick={() => handleMarkAsSolved(previewModal._id)}>
-                        Mark as Solved
-                      </button>
-                    )}
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
