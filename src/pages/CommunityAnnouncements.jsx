@@ -45,6 +45,20 @@ const MULTINATIONAL_STREETS = [
   "Rogationist",
   "John Paul",
 ];
+function formatAuthor(author) {
+  const role = (author?.role || '').toLowerCase();
+  const name = (author?.name || '').trim();
+
+  if (role === 'official') {
+    // show "Official — <name>" only if name is not literally "Official"
+    return `Official${name && name.toLowerCase() !== 'official' ? ' — ' + name : ''}`;
+  }
+  // other roles: "Role — Name" or just "Role"/"Name" when missing
+  if (name && role) return `${capitalize(role)} — ${name}`;
+  if (role) return capitalize(role);
+  if (name) return name;
+  return 'User';
+}
 
 export default function CommunityAnnouncements() {
   const notify = useDesktopNotification();
@@ -230,8 +244,9 @@ export default function CommunityAnnouncements() {
     if (aUrgent && !bUrgent) return -1;
     if (!aUrgent && bUrgent) return 1;
 
-    const aDate = new Date(a.date || a.createdAt || 0);
-    const bDate = new Date(b.date || b.createdAt || 0);
+    // NEW: purely by posted timestamp
+    const aDate = new Date(a.createdAt || 0);
+    const bDate = new Date(b.createdAt || 0);
     return bDate - aDate;
   });
 
@@ -249,27 +264,25 @@ export default function CommunityAnnouncements() {
       formData.append("description", announcementText);
       formData.append("category", categoryInput || "Community Announcement");
       formData.append("location", locationInput);
-      formData.append("date", dateInput);
-      formData.append("time", timeInput);
+      
       formData.append("contact", contactInput);
+
+      if (dateInput) formData.append("date", dateInput);
+      if (timeInput) formData.append("time", timeInput);
       
       if (announcementImage) {
-  formData.append("image", announcementImage, announcementImage.name || "upload.jpg");
-}
+        formData.append("image", announcementImage, announcementImage.name || "upload.jpg");}
 
 
       let res;
       if (editingAnnouncement) {
-      
-        res = await axios.put(
-  `${API_URL}/api/announcements/${editingAnnouncement._id}`,
-  formData,
-  {
-    headers: {
-      ...authHeader,
-    },
-  }
-);
+        res = await axios.put(`${API_URL}/api/announcements/${editingAnnouncement._id}`,
+          formData,
+          {
+            headers: {
+              ...authHeader, },
+            }
+          );
 
 
         setAnnouncements((prev) =>
@@ -600,19 +613,24 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
 
                   <div className="flex items-center text-sm mt-auto">
                     <span className="text-green-700 font-semibold mr-4">
-                      {a.date && !isNaN(new Date(a.date))
-                        ? new Date(a.date).toLocaleDateString()
-                        : a.createdAt
-                        ? new Date(a.createdAt).toLocaleDateString()
-                        : "No Date"}
-                    </span>
-                    {a.location && (
-                      <span className="flex items-center text-pink-600">
-                        📍 {a.location}
+                      {a.createdAt ? new Date(a.createdAt).toLocaleString() : '—'}
                       </span>
-                    )}
-                  </div>
-                </div>
+                      
+                      {/* Author */}
+                      {!!a.author && (
+  <span className="text-gray-600 mr-4">
+    <strong>{formatAuthor(a.author)}</strong>
+  </span>
+)}
+
+
+                        {a.location && (
+                          <span className="flex items-center text-pink-600">
+                            📍 {a.location}
+                            </span>
+                          )}
+                          </div>
+                          </div>
               </motion.div>
             ))}
         </div>
@@ -647,24 +665,21 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
               </button>
               <h2 className="modal-title">{activeAnnouncement.title}</h2>
               <p className="modal-category">{activeAnnouncement.category}</p>
+
               <div className="modal-meta">
+                <p>🧑 <strong>Posted by:</strong> <strong>{formatAuthor(activeAnnouncement.author)}</strong></p>
+
+                <p> 🕒 <strong>Posted at:</strong>{" "}
+                {activeAnnouncement.createdAt ? new Date(activeAnnouncement.createdAt).toLocaleString() : "—"}
+                </p>
+                {/* Optional: event details if provided */}
                 {activeAnnouncement.location && (
-                  <p>
-                    📍 <strong>Location:</strong> {activeAnnouncement.location}
-                  </p>
-                )}
-                {activeAnnouncement.time && (
-                  <p>
-                    ⏰ <strong>Time:</strong> {activeAnnouncement.time}
-                  </p>
-                )}
-                {activeAnnouncement.date && (
-                  <p>
-                    📅 <strong>Date:</strong> {activeAnnouncement.date}
-                  </p>
-                )}
-              </div>
-              <div className="modal-description">{activeAnnouncement.description}</div>
+                  <p>📍 <strong>Location:</strong> {activeAnnouncement.location}</p>)}
+                  {activeAnnouncement.time && (
+                    <p>⏰ <strong>Event Time:</strong> {activeAnnouncement.time}</p>)}
+                    {activeAnnouncement.date && (
+                       <p>📅 <strong>Event Date:</strong> {activeAnnouncement.date}</p>)}</div>
+                       <div className="modal-description">{activeAnnouncement.description}</div>
 
               {/* NEW: Announcement Reactions */}
               <div className="flex items-center gap-3 mt-3">
