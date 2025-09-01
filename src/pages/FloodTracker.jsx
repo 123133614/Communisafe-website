@@ -1,27 +1,27 @@
 // src/components/FloodTracker.jsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import useDesktopNotification from "../hooks/useDesktopNotification";
-import FloodReadingsTable from "./FloodReadingsTable";
+// src/components/FloodTracker.jsx
+import FloodReadingsTable from "./FloodReadingsTable"; // ⬅️ ADD THIS
+import FloodReportsTable from "./FloodReportsTable";
+
 import axios from "axios";
 
-// Leaflet
+// Leaflet imports
 import {
   MapContainer,
   TileLayer,
   Marker,
   Popup,
+  useMapEvents,
   Polyline,
-  Circle,
-  CircleMarker,
-  useMap,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import "../css/FloodTracker.css";
 
-// Chart
 import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -36,10 +36,8 @@ ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip,
 
 const API_URL = process.env.REACT_APP_API_URL || "https://communisafe-backend.onrender.com";
 
-// ─────────────────────────────────────────────────────────────
-// Village route (same lat,lng order as your mobile)
-// ─────────────────────────────────────────────────────────────
-const VILLAGE_LINE = [
+
+const geojsonLineString = [
   [14.494416374245276, 121.00305909128258],
   [14.494081134506985, 121.00369914809767],
   [14.493461447593617, 121.00631183902738],
@@ -71,20 +69,17 @@ const VILLAGE_LINE = [
   [14.494475642344739, 121.00302095511921],
 ];
 
-// Fixed pins (always drawn, like on mobile)
-const FIXED_PINS = [
-  { name: "Sensor A", lat: 14.494429267672885, lng: 121.00303692152471 },
-  { name: "Sensor B", lat: 14.478537582457562, lng: 121.00265712320015 },
-  { name: "Sensor C", lat: 14.491841264691814, lng: 121.00829594057382 },
+const geojsonPoints = [
+  [14.494429267672885, 121.00303692152471],
+  [14.478537582457562, 121.00265712320015],
+  [14.491841264691814, 121.00829594057382],
 ];
 
 // ─── Helpers ─────────────────────────────────────────
 function formatTimestamp(isoString) {
-  if (!isoString) return "-";
   const date = new Date(isoString);
   return date.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", hour12: true });
 }
-
 async function reverseGeocode(lat, lng) {
   try {
     const res = await fetch(
@@ -97,68 +92,34 @@ async function reverseGeocode(lat, lng) {
   }
 }
 
-// attach token, consistently
-const authHeaders = () => {
-  const token = localStorage.getItem("token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
 // Click-to-report
 function LocationMarker({ setNewAlert, setShowModal, sensor }) {
-  const map = useMap();
-  useEffect(() => {
-    setTimeout(() => map.invalidateSize(true), 150);
-  }, [map]);
+  useMapEvents({
+    click: async (e) => {
+      const { lat, lng } = e.latlng;
+      const now = new Date();
+      const tzISO = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();
+      const locationName = await reverseGeocode(lat, lng);
 
-  useMap().on("click", async (e) => {
-    const { lat, lng } = e.latlng;
-    const now = new Date();
-    const tzISO = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();
-    const locationName = await reverseGeocode(lat, lng);
-
-    let severity = "";
-    if (sensor && sensor.waterLevel != null) {
-      const ft = Number(sensor.waterLevel) / 30.48;
-      if (ft >= 2.9) severity = "High";
-      else if (ft >= 2) severity = "Medium";
-      else severity = "Low";
-    }
-
-    setNewAlert((prev) => ({
-      ...prev,
-      lat: lat.toFixed(6),
-      lng: lng.toFixed(6),
-      location: locationName,
-      timestamp: tzISO,
-      severity,
-    }));
-    setShowModal(true);
-  });
-  return null;
-}
-
-// Fit map to everything we render
-function FitToData({ village, pins, hotspots, alerts }) {
-  const map = useMap();
-  useEffect(() => {
-    const bounds = [];
-    if (village?.length) bounds.push(L.polyline(village).getBounds());
-    (pins || []).forEach((p) => bounds.push(L.latLngBounds([[p.lat, p.lng], [p.lat, p.lng]])));
-    (hotspots || []).forEach((h) => bounds.push(L.circle([h.lat, h.lng], { radius: 140 }).getBounds()));
-    (alerts || []).forEach((a) => {
-      const lat = Number(a.lat), lng = Number(a.lng);
-      if (Number.isFinite(lat) && Number.isFinite(lng)) {
-        bounds.push(L.latLngBounds([[lat, lng], [lat, lng]]));
+      let severity = "";
+      if (sensor && sensor.waterLevel) {
+        const ft = sensor.waterLevel / 30.48;
+        if (ft >= 2.9) severity = "High";
+        else if (ft >= 2) severity = "Medium";
+        else severity = "Low";
       }
-    });
 
-    if (!bounds.length) return;
-    try {
-      const group = bounds.reduce((acc, b) => (acc ? acc.extend(b) : b), null);
-      map.fitBounds(group, { padding: [16, 16], maxZoom: 18 });
-      setTimeout(() => map.invalidateSize(true), 50);
-    } catch {}
-  }, [map, village, pins, hotspots, alerts]);
+      setNewAlert((prev) => ({
+        ...prev,
+        lat: lat.toFixed(6),
+        lng: lng.toFixed(6),
+        location: locationName,
+        timestamp: tzISO,
+        severity,
+      }));
+      setShowModal(true);
+    },
+  });
   return null;
 }
 
@@ -166,32 +127,70 @@ export default function FloodTracker() {
   const notify = useDesktopNotification();
   const navigate = useNavigate();
   const location = useLocation();
-  const [view, setView] = useState("live");
+  const [view, setView] = useState("live"); 
 
-  // Guard: must be logged in (token present), else kick to login
-  useEffect(() => {
-    const t = localStorage.getItem("token");
-    if (!t) navigate("/login");
-  }, [navigate]);
-
-  // sidebar
+  // ─── Sidebar links (same order/icons as Visitor) ─────────────────────────
   const sidebarLinks = [
-    { label: "Dashboard", route: "/dashboard",
-      svg: (<svg className="appr-sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8v-10h-8v10zm0-18v6h8V3h-8z"/></svg>) },
-    { label: "Community Announcements", route: "/announcements",
-      svg: (<svg className="appr-sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9h4l10-5v14l-10-5H2V9zm1 1v4h3v-4H3zm14-2.618L7.8 10H5v2h2.8L18 12.618V7.382z"/></svg>) },
-    { label: "Flood Tracker", route: "/flood-tracker",
-      svg: (<svg className="appr-sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M2 14c4-4 8 4 12 0 4-4 8 4 8 4v4H2v-4z"/><path d="M2 9c4-4 8 4 12 0 4-4 8 4 8 4v1H2V9z"/></svg>) },
-    { label: "Incident Report", route: "/incidentreport",
-      svg: (<svg className="appr-sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M6 2h9l5 5v15H6V2zM15 3.5V8h4.5L15 3.5z"/></svg>) },
-    { label: "Visitor Management", route: "/visitorManagement",
-      svg: (<svg className="appr-sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 1.2c-3.6 0-10.8 1.8-10.8 5.4V22h21.6v-3.6c0-3.6-7.2-5.4-10.8-5.4z"/></svg>) },
-    { label: "Approval Accounts", route: "/approve-accounts",
-      svg: (<svg className="appr-sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 1.2c-3.6 0-10.8 1.8-10.8 5.4V22h21.6v-3.6c0-3.6-7.2-5.4-10.8-5.4z"/></svg>) },
+    {
+      label: "Dashboard",
+      route: "/dashboard",
+      svg: (
+        <svg className="appr-sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8v-10h-8v10zm0-18v6h8V3h-8z" />
+        </svg>
+      ),
+    },
+    {
+      label: "Community Announcements",
+      route: "/announcements",
+      svg: (
+        <svg className="appr-sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M2 9h4l10-5v14l-10-5H2V9zm1 1v4h3v-4H3zm14-2.618L7.8 10H5v2h2.8L18 12.618V7.382z" />
+        </svg>
+      ),
+    },
+    {
+      label: "Flood Tracker",
+      route: "/flood-tracker",
+      svg: (
+        <svg className="appr-sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M2 14c4-4 8 4 12 0 4-4 8 4 8 4v4H2v-4z" />
+          <path d="M2 9c4-4 8 4 12 0 4-4 8 4 8 4v1H2V9z" />
+        </svg>
+      ),
+    },
+    {
+      label: "Incident Report",
+      route: "/incidentreport",
+      svg: (
+        <svg className="appr-sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M6 2h9l5 5v15H6V2zM15 3.5V8h4.5L15 3.5z" />
+        </svg>
+      ),
+    },
+    {
+      label: "Visitor Management",
+      route: "/visitorManagement",
+      svg: (
+        <svg className="appr-sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 1.2c-3.6 0-10.8 1.8-10.8 5.4V22h21.6v-3.6c0-3.6-7.2-5.4-10.8-5.4z" />
+        </svg>
+      ),
+    },
+    {
+      label: "Approval Accounts",
+      route: "/approve-accounts",
+      svg: (
+        <svg className="appr-sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 1.2c-3.6 0-10.8 1.8-10.8 5.4V22h21.6v-3.6c0-3.6-7.2-5.4-10.8-5.4z" />
+        </svg>
+      ),
+    },
   ];
 
   const [alerts, setAlerts] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState(null);
 
   const [newAlert, setNewAlert] = useState({
     location: "",
@@ -204,189 +203,172 @@ export default function FloodTracker() {
   });
 
   const [sensor, setSensor] = useState(null);
-  const [sensors, setSensors] = useState([]);      // all sensors for map pins
-  const [hotspots, setHotspots] = useState([]);    // red/orange map areas
-
   const role = localStorage.getItem("role") || "";
   const canReport = role === "security" || role === "official";
+  const token = localStorage.getItem("token");
+  // history for the chart (time-series)
+const [series, setSeries] = useState([]);   // cm values
+const [labels, setLabels] = useState([]);   // time strings
 
-  // Chart state
-  const [series, setSeries] = useState([]);
-  const [labels, setLabels] = useState([]);
+  
 
-  // ── Fetch sensors + alerts + hotspots
+  const [floodSensors, setFloodSensors] = useState([]);
+  const [waterLevels, setWaterLevels] = useState([]);
+  const [timestamps, setTimestamps] = useState([]);
+  
+
+  // Fetch sensor data every 5s
   useEffect(() => {
-    const load = async () => {
+    const fetchSensorData = async () => {
       try {
-        const [sRes, aRes, hRes] = await Promise.all([
-          axios.get(`${API_URL}/api/flood/sensors`,   { headers: authHeaders() }),
-          axios.get(`${API_URL}/api/flood/reports`,   { headers: authHeaders() }),
-          axios.get(`${API_URL}/api/flood/hotspots`,  { headers: authHeaders() }),
-        ]);
-        const sensorList = Array.isArray(sRes.data) ? sRes.data : [];
-        setSensors(sensorList);
-        setSensor(sensorList.length ? sensorList[0] : null);
-        setAlerts(Array.isArray(aRes.data) ? aRes.data : []);
-        setHotspots(hRes.data?.hotspots || []);
+        const res = await axios.get(`${API_URL}/api/flood/sensors`);
+        setFloodSensors(res.data);
+        const sorted = [...res.data].sort((a, b) => new Date(a.lastUpdated) - new Date(b.lastUpdated));
+        setWaterLevels(sorted.map((s) => s.waterLevel));
+        setTimestamps(sorted.map((s) => new Date(s.lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })));
       } catch (e) {
-        console.error("Init load error:", e?.response?.data || e.message);
+        console.error("Error fetching flood sensor data:", e);
       }
     };
-    load();
-    const id = setInterval(load, 5000);
+    fetchSensorData();
+    const id = setInterval(fetchSensorData, 5000);
     return () => clearInterval(id);
   }, []);
 
-  // readings for selected sensor
+  // fetch 1st sensor + alerts
   useEffect(() => {
-    if (!sensor?._id) return;
-    let stop = false;
-    const tick = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/flood/readings`, {
-          params: { sensorId: sensor._id, page: 1, limit: 60 },
-          headers: authHeaders(),
-        });
-        if (stop) return;
-        const items = (res.data.items || []).slice().reverse();
-        setSeries(items.map((r) => Number(r.waterLevel || 0)));
-        setLabels(
-          items.map((r) =>
-            new Date(r.recordedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-          )
-        );
-      } catch (e) {
-        console.error("readings load error:", e?.response?.data || e.message);
-      }
-    };
-    tick();
-    const id = setInterval(tick, 5000);
-    return () => {
-      stop = true;
-      clearInterval(id);
-    };
-  }, [sensor?._id]);
+    axios
+      .get(`${API_URL}/api/flood/sensors`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then((res) => res.data?.length && setSensor(res.data[0]))
+      .catch(() => {});
 
-  // Submit flood report (SEND coordinates object, not top-level lat/lng)
+    axios
+      .get(`${API_URL}/api/flood/reports`)
+      .then((res) => setAlerts(res.data))
+      .catch(() => {});
+  }, []);
+  // Load latest readings for the currently selected sensor (every 5s)
+useEffect(() => {
+  if (!sensor?._id) return;
+
+  let stop = false;
+
+  const load = async () => {
+    try {
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await axios.get(`${API_URL}/api/flood/readings`, {
+        params: { sensorId: sensor._id, page: 1, limit: 60 },
+        headers,
+      });
+      if (stop) return;
+      const items = (res.data.items || []).slice().reverse(); // oldest→newest
+      setSeries(items.map(r => Number(r.waterLevel || 0)));
+      setLabels(items.map(r =>
+        new Date(r.recordedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      ));
+    } catch (e) {
+      console.error("readings load error:", e);
+    }
+  };
+
+  load();
+  const id = setInterval(load, 5000);
+  return () => { stop = true; clearInterval(id); };
+}, [sensor?._id, token]);
+
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      axios
+        .get(`${API_URL}/api/flood/sensors`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+        .then((res) => res.data?.length && setSensor(res.data[0]))
+        .catch(() => {});
+    }, 10000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Submit flood report
   const handleReportSubmit = async (e) => {
     e.preventDefault();
     const latNum = parseFloat(newAlert.lat);
     const lngNum = parseFloat(newAlert.lng);
-    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
-      return alert("Latitude and Longitude must be valid numbers.");
-    }
+    if (isNaN(latNum) || isNaN(lngNum)) return alert("Latitude and Longitude must be valid numbers.");
+
     try {
-      const payload = {
-        severity: newAlert.severity,
-        location: newAlert.location,
-        description: newAlert.description,
-        contact: newAlert.contact,
-        coordinates: { lat: latNum, lng: lngNum },
-      };
-      await axios.post(`${API_URL}/api/flood/reports`, payload, { headers: authHeaders() });
+      const payload = { ...newAlert, lat: latNum, lng: lngNum, contact: newAlert.contact };
+      await axios.post(`${API_URL}/api/flood/reports`, payload, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
 
       setShowModal(false);
       setNewAlert({ location: "", severity: "", description: "", contact: "", timestamp: "", lat: "", lng: "" });
 
-      const res = await axios.get(`${API_URL}/api/flood/reports`, { headers: authHeaders() });
+      const res = await axios.get(`${API_URL}/api/flood/reports`);
       setAlerts(res.data);
     } catch (err) {
-      console.error("❌ Failed to submit flood report:", err?.response?.data || err.message);
+      console.error("❌ Failed to submit flood report:", err);
       alert("❌ Failed to submit flood report. Please make sure you are logged in.");
     }
   };
 
-  const getSeverityColor = (sev) => {
-    const s = String(sev || "").toLowerCase();
-    if (s === "high") return "red";
-    if (s === "medium") return "orange";
-    if (s === "low") return "blue";
+  const getSeverityColor = (severity) => {
+    if (severity === "HIGH") return "red";
+    if (severity === "MEDIUM") return "orange";
     return "blue";
   };
 
-  // Sensor level summary
-  const waterLevelFt = sensor?.waterLevel ? sensor.waterLevel / 30.48 : 0;
-  let floodLevel = "NONE";
-  if (waterLevelFt >= 2.9) floodLevel = "HIGH";
-  else if (waterLevelFt >= 2.0) floodLevel = "MEDIUM";
-  else if (waterLevelFt >= 1.0) floodLevel = "LOW";
+ const waterLevelFt = sensor?.waterLevel ? sensor.waterLevel / 30.48 : 0;
+let floodLevel = "NONE";
+if (waterLevelFt >= 2.9) floodLevel = "HIGH";
+else if (waterLevelFt >= 2.0) floodLevel = "MEDIUM";
+else if (waterLevelFt >= 1.0) floodLevel = "LOW";
 
-  // Chart config
-  const THRESH = { low: 30, medium: 60, high: 90 };
-  const levelColor = (y) => {
-    if (y >= THRESH.high) return "red";
-    if (y >= THRESH.medium) return "orange";
-    if (y >= THRESH.low) return "blue";
-    return "green";
-  };
+  // thresholds in cm (i-adjust mo kung gusto mo)
+const THRESH = { low: 30, medium: 60, high: 90 };
 
-  const chartData = useMemo(() => ({
-    labels,
-    datasets: [
-      {
-        label: "Water Level (cm)",
-        data: series,
-        borderWidth: 3,
-        tension: 0.3,
-        pointRadius: 0,
-        fill: false,
-        segment: {
-          borderColor: (ctx) => {
-            const y = ctx.p1?.parsed?.y ?? 0;
-            return levelColor(y);
-          },
+const levelColor = (y) => {
+  if (y >= THRESH.high) return "red";
+  if (y >= THRESH.medium) return "orange";
+  if (y >= THRESH.low) return "blue"; // Low = blue (ayon sa legend mo)
+  return "green"; // normal
+};
+
+const chartData = {
+  labels,          // galing sa readings history
+  datasets: [
+    {
+      label: "Water Level (cm)",
+      data: series, // galing sa readings history
+      borderWidth: 3,
+      tension: 0.3,
+      pointRadius: 0,
+      fill: false,
+      // 👉 ito ang nagpapailaw per segment habang tumataas
+      segment: {
+        borderColor: (ctx) => {
+          const y = ctx.p1?.parsed?.y ?? 0; // color by next point's height
+          return levelColor(y);
         },
       },
-    ],
-  }), [labels, series]);
-
-  const chartOptions = {
-    responsive: true,
-    animation: false,
-    scales: {
-      y: { beginAtZero: true, ticks: { stepSize: 10 }, title: { display: true, text: "Water Level (cm)" } },
-      x: { title: { display: true, text: "Time" } },
     },
-  };
+  ],
+};
 
-  // build leaflet icons for alerts
-  const alertIconCache = useMemo(() => ({}), []);
-  const getAlertIcon = (sev) => {
-    const color = getSeverityColor(sev);
-    if (alertIconCache[color]) return alertIconCache[color];
-    const icon = new L.Icon({
-      iconUrl: `https://maps.google.com/mapfiles/ms/icons/${color}-dot.png`,
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34],
-      shadowUrl: markerShadow,
-      shadowSize: [41, 41],
-    });
-    alertIconCache[color] = icon;
-    return icon;
-  };
-
-  // Derive live map points from sensors (colored by severity)
-  const liveSensorPoints = useMemo(() => {
-    return (sensors || [])
-      .map((s) => {
-        const wl = Number(s.waterLevel ?? 0);
-        let lat = s.coordinates?.lat != null ? Number(s.coordinates.lat) : NaN;
-        let lng = s.coordinates?.lng != null ? Number(s.coordinates.lng) : NaN;
-        if (Number.isFinite(lat) && Number.isFinite(lng) && lat > 100 && lng < 100) {
-          const tmp = lat; lat = lng; lng = tmp;
-        }
-        const ft = wl / 30.48;
-        const level = ft >= 3 ? "High" : ft >= 2 ? "Medium" : "Low";
-        const color = level === "High" ? "#dc3545" : level === "Medium" ? "#3A5BA0" : "#28a745";
-        return { name: s.name || "Sensor", lat, lng, wl, level, color, updated: s.lastUpdated || null };
-      })
-      .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
-  }, [sensors]);
+const chartOptions = {
+  responsive: true,
+  animation: false,
+  scales: {
+    y: {
+      beginAtZero: true,
+      ticks: { stepSize: 10 },
+      title: { display: true, text: "Water Level (cm)" },
+    },
+    x: { title: { display: true, text: "Time" } },
+  },
+  plugins: { legend: { display: false } },
+};
 
   return (
     <div className="appr-container">
-      {/* Sidebar */}
+      {/* Sidebar — same look as Visitor Management */}
       <aside
         className="appr-sidebar"
         style={{ backgroundImage: `url(${process.env.PUBLIC_URL}/assets/sidebar.png)` }}
@@ -406,196 +388,214 @@ export default function FloodTracker() {
       </aside>
 
       {/* Main */}
-      <main className="appr-main">
-        <header className="appr-header">
-          <h1>Flood Tracker</h1>
-        </header>
+     <main className="appr-main">
+  <header className="appr-header">
+    <h1>Flood Tracker</h1>
+  </header>
 
-        {/* View toggle */}
-        <div className="flex gap-2 mb-3">
-          <button className="btn-submit" onClick={() => setView("live")} disabled={view === "live"}>
-            Live
-          </button>
-          <button className="btn-cancel" onClick={() => setView("records")} disabled={view === "records"}>
-            Records
-          </button>
+  {/* View toggle */}
+  <div className="flex gap-2 mb-3">
+    <button
+      className="btn-submit"
+      onClick={() => setView("live")}
+      disabled={view === "live"}
+    >
+      Live
+    </button>
+    <button
+      className="btn-cancel"
+      onClick={() => setView("records")}
+      disabled={view === "records"}
+    >
+      Records
+    </button>
+
+
+     <button
+     className="btn-cancel"
+     onClick={() => setView("reports")}
+     disabled={view === "reports"}>
+      Reports
+     </button>
+  </div>
+
+
+  {view === "live" ? (
+    <>
+      {/* Map Card */}
+      <section className="appr-card" style={{ padding: 16 }}>
+        <h2 className="text-lg font-bold text-gray-700 mb-2">Flood Map</h2>
+        <div
+          className="rounded-2xl overflow-hidden border border-green-100 bg-white"
+          style={{ height: 340 }}
+        >
+          <MapContainer
+            center={[14.4875, 121.0075]}
+            zoom={17}
+            style={{ height: "100%", width: "100%" }}
+          >
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution="&copy; OpenStreetMap contributors"
+            />
+            {canReport && (
+              <LocationMarker
+                setNewAlert={setNewAlert}
+                setShowModal={setShowModal}
+                sensor={sensor}
+              />
+            )}
+
+            {alerts.map((alert, i) => {
+              const iconColor = getSeverityColor(alert.severity);
+              const customIcon = new L.Icon({
+                iconUrl: `https://maps.google.com/mapfiles/ms/icons/${iconColor}-dot.png`,
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowUrl: markerShadow,
+                shadowSize: [41, 41],
+              });
+              return (
+                <Marker
+                  key={i}
+                  position={[
+                    parseFloat(alert.lat),
+                    parseFloat(alert.lng),
+                  ]}
+                  icon={customIcon}
+                >
+                  <Popup>
+                    <strong>{alert.location}</strong>
+                    <br />
+                    {alert.description}
+                    <br />
+                    <span
+                      style={{
+                        color: getSeverityColor(alert.severity),
+                        fontWeight: "bold",
+                      }}
+                    >
+                      Severity: {alert.severity}
+                    </span>
+                    <br />
+                    {formatTimestamp(alert.timestamp)}
+                  </Popup>
+                </Marker>
+              );
+            })}
+
+            <Polyline
+              positions={geojsonLineString}
+              pathOptions={{ color: "blue", weight: 4, dashArray: "6 8" }}
+            />
+            {sensor && (
+              <Marker position={geojsonPoints[0]}>
+                <Popup>
+                  <strong>{sensor.name}</strong>
+                  <br />
+                  {sensor.address}
+                  <br />
+                  Water Level: {sensor.waterLevel} cm / {waterLevelFt.toFixed(2)} ft
+                  <br />
+                  Flood Level: {floodLevel}
+                </Popup>
+              </Marker>
+            )}
+            {geojsonPoints.slice(1).map((pos, idx) => (
+              <Marker key={idx + 1} position={pos} />
+            ))}
+          </MapContainer>
         </div>
 
-        {view === "live" ? (
-          <>
-            {/* Map Card */}
-            <section className="appr-card" style={{ padding: 16 }}>
-              <h2 className="text-lg font-bold text-gray-700 mb-2">Flood Map</h2>
-              <div className="rounded-2xl overflow-hidden border border-green-100 bg-white" style={{ height: 360 }}>
-                <MapContainer
-                  center={[14.4875, 121.0075]}
-                  zoom={16}
-                  style={{ height: "100%", width: "100%" }}
+        {/* Legend */}
+        <div className="flex gap-4 mt-2 text-sm">
+          <div className="flex items-center gap-1">
+            <span className="inline-block w-3 h-3 rounded-full bg-green-600" /> Sensor
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="inline-block w-3 h-3 rounded-full bg-blue-600" /> Low
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="inline-block w-3 h-3 rounded-full bg-orange-400" /> Medium
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="inline-block w-3 h-3 rounded-full bg-red-600" /> High
+          </div>
+        </div>
+      </section>
+
+      {/* Chart Card */}
+      <section className="appr-card" style={{ padding: 16, marginTop: 16 }}>
+        <h3 className="text-lg font-semibold text-green-700 mb-2">
+          📈 Real-Time Water Level Chart
+        </h3>
+        <div style={{ height: 300 }}>
+          <Line data={chartData} options={chartOptions} />
+        </div>
+      </section>
+
+      {/* Sensor Data Card */}
+      <section className="appr-card" style={{ padding: 16, marginTop: 16 }}>
+        <h3 className="font-semibold text-gray-700 mb-2">Sensor Real-Time Data</h3>
+        <div
+          className="sensor-card"
+          style={{ boxShadow: "none", border: "none", padding: 0 }}
+        >
+          {sensor ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <span>
+                <strong>Location:</strong> {sensor.address}
+              </span>
+              <span>
+                <strong>Water Level:</strong> {sensor.waterLevel} cm /{" "}
+                {waterLevelFt.toFixed(2)} ft
+              </span>
+              <span>
+                <strong>Battery:</strong> {sensor.batteryLevel}%
+              </span>
+              <span>
+                <strong>Signal:</strong> {sensor.signalStrength}
+              </span>
+              <span>
+                <strong>Status:</strong> {sensor.status}
+              </span>
+              <span>
+                <strong>Last Updated:</strong>{" "}
+                {sensor.lastUpdated ? formatTimestamp(sensor.lastUpdated) : "N/A"}
+              </span>
+              <span>
+                <strong>Flood Level:</strong>{" "}
+                <span
+                  style={{
+                    color:
+                      floodLevel === "HIGH"
+                        ? "red"
+                        : floodLevel === "MEDIUM"
+                        ? "orange"
+                        : floodLevel === "LOW"
+                        ? "blue"
+                        : "gray",
+                    fontWeight: "bold",
+                  }}
                 >
-                  <TileLayer
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    attribution="&copy; OpenStreetMap contributors"
-                  />
+                  {floodLevel}
+                </span>
+              </span>
+            </div>
+          ) : (
+            <span className="text-gray-500">No sensor data available.</span>
+          )}
+        </div>
+      </section>
+    </>
+ ) : view === "records" ? (
+  <FloodReadingsTable sensorId={sensor?._id} />
+   ) : (
+    <FloodReportsTable />
+    )}
+</main>
 
-                  {/* click-to-report (security/official only) */}
-                  {canReport && (
-                    <LocationMarker
-                      setNewAlert={setNewAlert}
-                      setShowModal={setShowModal}
-                      sensor={sensor}
-                    />
-                  )}
-
-                  {/* Village line */}
-                  <Polyline positions={VILLAGE_LINE} pathOptions={{ color: "#3A5BA0", weight: 4, dashArray: "6 8" }} />
-
-                  {/* Fixed 3 pins (always visible) */}
-                  {FIXED_PINS.map((p, idx) => (
-                    <CircleMarker
-                      key={`fixed-${idx}`}
-                      center={[p.lat, p.lng]}
-                      radius={9}
-                      pathOptions={{ color: "#086a1a", weight: 3, fillColor: "#28a745", fillOpacity: 0.85 }}
-                    >
-                      <Popup><strong>{p.name}</strong></Popup>
-                    </CircleMarker>
-                  ))}
-
-                  {/* Live sensor pins + red ring for High */}
-                  {liveSensorPoints.map((p, idx) => (
-                    <React.Fragment key={`live-${idx}`}>
-                      <CircleMarker
-                        center={[p.lat, p.lng]}
-                        radius={11}
-                        pathOptions={{ color: "#fff", weight: 2, fillColor: p.color, fillOpacity: 0.9 }}
-                      >
-                        <Popup>
-                          <strong>{p.name}</strong><br />
-                          {p.wl?.toFixed?.(2) ?? p.wl} cm •{" "}
-                          <span style={{ color: p.color, fontWeight: "bold" }}>{p.level}</span><br />
-                          <small>{formatTimestamp(p.updated)}</small>
-                        </Popup>
-                      </CircleMarker>
-                      {p.level === "High" && (
-                        <Circle center={[p.lat, p.lng]} radius={140} pathOptions={{ color: "#dc3545", fillColor: "#dc3545", fillOpacity: 0.25, weight: 2 }} />
-                      )}
-                    </React.Fragment>
-                  ))}
-
-                  {/* Alerts (user reports) — READ from coordinates; skip invalid */}
-                  {alerts.map((alert, i) => {
-                    const lat = Number(alert?.coordinates?.lat);
-                    const lng = Number(alert?.coordinates?.lng);
-                    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-                    return (
-                      <Marker
-                        key={`alert-${i}`}
-                        position={[lat, lng]}
-                        icon={getAlertIcon(alert.severity)}
-                      >
-                        <Popup>
-                          <strong>{alert.location}</strong><br />
-                          {alert.description}<br />
-                          <span style={{ color: getSeverityColor(alert.severity), fontWeight: "bold" }}>
-                            Severity: {alert.severity}
-                          </span><br />
-                          {formatTimestamp(alert.timestamp || alert.createdAt)}
-                        </Popup>
-                      </Marker>
-                    );
-                  })}
-
-                  {/* Hotspots (orange/red) */}
-                  {hotspots.map((h, i) => {
-                    const lat = Number(h.coordinates?.lat);
-                    const lng = Number(h.coordinates?.lng);
-                    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-                    const color = h.level === "red" ? "red" : h.level === "orange" ? "orange" : null;
-                    if (!color) return null;
-                    return (
-                      <Circle
-                        key={`hs-${i}`}
-                        center={[lat, lng]}
-                        radius={140}
-                        pathOptions={{ color, fillColor: color, fillOpacity: 0.28, weight: 2 }}
-                      >
-                        <Popup>
-                          <strong>{h.label || "Area"}</strong><br />
-                          {h.count || 0} reports (last window)
-                        </Popup>
-                      </Circle>
-                    );
-                  })}
-
-                  {/* Auto-fit all layers */}
-                  <FitToData
-                    village={VILLAGE_LINE}
-                    pins={FIXED_PINS}
-                    hotspots={hotspots.map(h => ({ lat: Number(h.coordinates?.lat), lng: Number(h.coordinates?.lng) }))}
-                    alerts={alerts.map(a => ({
-                      lat: Number(a?.coordinates?.lat),
-                      lng: Number(a?.coordinates?.lng)
-                    }))}
-                  />
-                </MapContainer>
-              </div>
-
-              {/* Legend */}
-              <div className="flex gap-4 mt-2 text-sm">
-                <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-green-600" /> Fixed sensor pins</div>
-                <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-[#28a745]" /> Low (live)</div>
-                <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-[#3A5BA0]" /> Medium (live)</div>
-                <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-red-600" /> High & red rings</div>
-                <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-orange-400" /> ≥5 user reports</div>
-                <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-red-600" /> ≥10 user reports</div>
-              </div>
-            </section>
-
-            {/* Chart Card */}
-            <section className="appr-card" style={{ padding: 16, marginTop: 16 }}>
-              <h3 className="text-lg font-semibold text-green-700 mb-2">📈 Real-Time Water Level Chart</h3>
-              <div style={{ height: 300 }}>
-                <Line data={chartData} options={chartOptions} />
-              </div>
-            </section>
-
-            {/* Sensor Data Card */}
-            <section className="appr-card" style={{ padding: 16, marginTop: 16 }}>
-              <h3 className="font-semibold text-gray-700 mb-2">Sensor Real-Time Data</h3>
-              <div className="sensor-card" style={{ boxShadow: "none", border: "none", padding: 0 }}>
-                {sensor ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <span><strong>Location:</strong> {sensor.address}</span>
-                    <span><strong>Water Level:</strong> {sensor.waterLevel} cm / {waterLevelFt.toFixed(2)} ft</span>
-                    <span><strong>Battery:</strong> {sensor.batteryLevel}%</span>
-                    <span><strong>Signal:</strong> {sensor.signalStrength}</span>
-                    <span><strong>Status:</strong> {sensor.status}</span>
-                    <span><strong>Last Updated:</strong> {formatTimestamp(sensor.lastUpdated)}</span>
-                    <span>
-                      <strong>Flood Level:</strong>{" "}
-                      <span
-                        style={{
-                          color:
-                            floodLevel === "HIGH" ? "red" :
-                            floodLevel === "MEDIUM" ? "orange" :
-                            floodLevel === "LOW" ? "blue" : "gray",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        {floodLevel}
-                      </span>
-                    </span>
-                  </div>
-                ) : (
-                  <span className="text-gray-500">No sensor data available.</span>
-                )}
-              </div>
-            </section>
-          </>
-        ) : (
-          <FloodReadingsTable sensorId={sensor?._id} />
-        )}
-      </main>
 
       {/* Report Modal */}
       {showModal && (role === "security" || role === "official") && (
