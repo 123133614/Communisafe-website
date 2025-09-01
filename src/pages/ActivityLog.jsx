@@ -111,6 +111,7 @@ export default function ActivityLog() {
                   <th>Type</th>
                   <th>Action</th>
                   <th>Platform</th>
+                  <th>IP</th>
                 </tr>
               </thead>
               <tbody>
@@ -123,6 +124,7 @@ export default function ActivityLog() {
                       <td>{log.type || "-"}</td>
                       <td>{log.action}</td>
                       <td>{log.platform || "web"}</td>
+                      <td>{log.ip || "-"}</td> 
                     </tr>
                   ))
                 ) : (
