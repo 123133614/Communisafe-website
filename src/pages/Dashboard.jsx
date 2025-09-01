@@ -21,6 +21,28 @@ function formatTimestamp(isoString) {
   });
 }
 
+function getAnnouncementAuthor(a = {}) {
+  const name =
+    a.author?.name ||
+    a.authorName ||
+    a.postedBy?.name ||
+    a.createdBy?.name ||
+    a.author || // sometimes string
+    a.uploaderName ||
+    "";
+
+  const role =
+    a.author?.role ||
+    a.postedBy?.role ||
+    a.createdBy?.role ||
+    a.role ||
+    "";
+
+  if (!name) return ""; // no author available
+  return role ? `${name} (${role})` : name;
+}
+
+
 export default function Dashboard() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [userInfo, setUserInfo] = useState({ name: "", email: "", role: "" });
@@ -326,7 +348,7 @@ export default function Dashboard() {
       <main className="appr-main">
         {/* Topbar */}
         <div className="topbar-container">
-          <h1 className="topbar-title">Welcome, {greeting}!</h1>
+          <h1 className="topbar-title">Welcome, Admin!</h1>
           <div className="flex items-center gap-6">
             <div
               onClick={() => navigate("/notifications")}
@@ -443,50 +465,50 @@ export default function Dashboard() {
                 <p className="text-sm text-gray-600 mb-4 whitespace-pre-line">
                   {announcements[0].description}
                 </p>
-                <small className="text-gray-500 text-xs">
-                  {formatTimestamp(
-                    announcements[0].createdAt || announcements[0].timestamp
-                  )}
-                </small>
+                {(() => { const a = announcements[0];
+                const authorLabel = getAnnouncementAuthor(a);
+                return (
+                <small className="text-gray-600 text-xs mb-1">
+                  Posted by: {authorLabel || "Official"}
+                  </small>
+                  );
+                  })()}
+                  {/* Date (existing) */}
+                  <small className="text-gray-500 text-xs">
+                    {formatTimestamp(announcements[0].createdAt || announcements[0].timestamp)}
+                    </small>
               </div>
 
-              {/* Image */}
-              {/* Image */}
-{(() => {
-  const a = announcements[0] || {};
-  const raw = a.imageUrl || a.image;        
-  const base = (process.env.REACT_APP_API_URL || "https://communisafe-backend.onrender.com").replace(/\/$/, "");
-
-  let imgSrc = "/assets/multiico.png";
-  if (raw) {
-    if (raw.startsWith("http")) {
-      imgSrc = raw;                          
-    } else if (raw.startsWith("/assets/")) {
-      imgSrc = raw;                          
-    } else {
-      imgSrc = `${base}/api/uploads/${raw}`; 
-    }
-  }
-
-  return (
-    <div className="flex-1 max-w-md bg-gray-100 flex items-center justify-center p-4">
-      <img
-        src={imgSrc}
-        alt={a.title || "Announcement"}
-        className="w-full h-full object-cover"
-        onError={(e) => {
-          e.currentTarget.onerror = null;
-          e.currentTarget.src = "/assets/multiico.png";
-        }}
-      />
-    </div>
-  );
-})()}
-
-            </motion.div>
-          )}
-        </section>
-      </main>
+           {(() => {
+            const a = announcements[0] || {};
+            const raw = a.imageUrl || a.image;        
+            const base = (process.env.REACT_APP_API_URL || "https://communisafe-backend.onrender.com").replace(/\/$/, "");
+            let imgSrc = "/assets/multiico.png";
+            if (raw) {
+               if (raw.startsWith("http")) {
+                 imgSrc = raw;                          
+                } else if (raw.startsWith("/assets/")) {
+                     imgSrc = raw;                          
+                     } else {
+                        imgSrc = `${base}/api/uploads/${raw}`; 
+                       }
+                      } return (
+                         <div className="flex-1 max-w-md bg-gray-100 flex items-center justify-center p-4">
+                           <img
+                            src={imgSrc}
+                             alt={a.title || "Announcement"}
+                             className="w-full h-full object-cover"
+                             onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = "/assets/multiico.png";
+                            }}/>
+                            </div>
+                            );
+                            })()}
+                            </motion.div>
+                          )}
+                          </section>
+                          </main>
 
       {/* Profile Modal */}
       {showProfileModal && (
