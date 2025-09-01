@@ -80,6 +80,7 @@ const FIXED_PINS = [
 
 // ─── Helpers ─────────────────────────────────────────
 function formatTimestamp(isoString) {
+  if (!isoString) return "-";
   const date = new Date(isoString);
   return date.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", hour12: true });
 }
@@ -106,7 +107,6 @@ const authHeaders = () => {
 function LocationMarker({ setNewAlert, setShowModal, sensor }) {
   const map = useMap();
   useEffect(() => {
-    // small safety in case map mounts in a hidden container
     setTimeout(() => map.invalidateSize(true), 150);
   }, [map]);
 
@@ -117,8 +117,8 @@ function LocationMarker({ setNewAlert, setShowModal, sensor }) {
     const locationName = await reverseGeocode(lat, lng);
 
     let severity = "";
-    if (sensor && sensor.waterLevel) {
-      const ft = sensor.waterLevel / 30.48;
+    if (sensor && sensor.waterLevel != null) {
+      const ft = Number(sensor.waterLevel) / 30.48;
       if (ft >= 2.9) severity = "High";
       else if (ft >= 2) severity = "Medium";
       else severity = "Low";
@@ -144,12 +144,9 @@ function FitToData({ village, pins, hotspots, alerts }) {
     const bounds = [];
     if (village?.length) bounds.push(L.polyline(village).getBounds());
     (pins || []).forEach((p) => bounds.push(L.latLngBounds([[p.lat, p.lng], [p.lat, p.lng]])));
-    (hotspots || []).forEach((h) => {
-      // Circle bounds
-      bounds.push(L.circle([h.lat, h.lng], { radius: 140 }).getBounds());
-    });
+    (hotspots || []).forEach((h) => bounds.push(L.circle([h.lat, h.lng], { radius: 140 }).getBounds()));
     (alerts || []).forEach((a) => {
-      const lat = parseFloat(a.lat), lng = parseFloat(a.lng);
+      const lat = Number(a.lat), lng = Number(a.lng);
       if (Number.isFinite(lat) && Number.isFinite(lng)) {
         bounds.push(L.latLngBounds([[lat, lng], [lat, lng]]));
       }
@@ -170,6 +167,12 @@ export default function FloodTracker() {
   const navigate = useNavigate();
   const location = useLocation();
   const [view, setView] = useState("live");
+
+  // Guard: must be logged in (token present), else kick to login
+  useEffect(() => {
+    const t = localStorage.getItem("token");
+    if (!t) navigate("/login");
+  }, [navigate]);
 
   // sidebar
   const sidebarLinks = [
@@ -216,13 +219,13 @@ export default function FloodTracker() {
     const load = async () => {
       try {
         const [sRes, aRes, hRes] = await Promise.all([
-          axios.get(`${API_URL}/api/flood/sensors`, { headers: authHeaders() }),
-          axios.get(`${API_URL}/api/flood/reports`, { headers: authHeaders() }),
-          axios.get(`${API_URL}/api/flood/hotspots`, { headers: authHeaders() }), // 🔴 red/orange areas
+          axios.get(`${API_URL}/api/flood/sensors`,   { headers: authHeaders() }),
+          axios.get(`${API_URL}/api/flood/reports`,   { headers: authHeaders() }),
+          axios.get(`${API_URL}/api/flood/hotspots`,  { headers: authHeaders() }),
         ]);
         const sensorList = Array.isArray(sRes.data) ? sRes.data : [];
         setSensors(sensorList);
-        if (sensorList.length) setSensor(sensorList[0]); else setSensor(null);
+        setSensor(sensorList.length ? sensorList[0] : null);
         setAlerts(Array.isArray(aRes.data) ? aRes.data : []);
         setHotspots(hRes.data?.hotspots || []);
       } catch (e) {
@@ -264,7 +267,7 @@ export default function FloodTracker() {
     };
   }, [sensor?._id]);
 
-  // Submit flood report
+  // Submit flood report (SEND coordinates object, not top-level lat/lng)
   const handleReportSubmit = async (e) => {
     e.preventDefault();
     const latNum = parseFloat(newAlert.lat);
@@ -273,7 +276,13 @@ export default function FloodTracker() {
       return alert("Latitude and Longitude must be valid numbers.");
     }
     try {
-      const payload = { ...newAlert, lat: latNum, lng: lngNum, contact: newAlert.contact };
+      const payload = {
+        severity: newAlert.severity,
+        location: newAlert.location,
+        description: newAlert.description,
+        contact: newAlert.contact,
+        coordinates: { lat: latNum, lng: lngNum },
+      };
       await axios.post(`${API_URL}/api/flood/reports`, payload, { headers: authHeaders() });
 
       setShowModal(false);
@@ -288,7 +297,6 @@ export default function FloodTracker() {
   };
 
   const getSeverityColor = (sev) => {
-    // accept both "HIGH"/"High" etc.
     const s = String(sev || "").toLowerCase();
     if (s === "high") return "red";
     if (s === "medium") return "orange";
@@ -339,7 +347,6 @@ export default function FloodTracker() {
       y: { beginAtZero: true, ticks: { stepSize: 10 }, title: { display: true, text: "Water Level (cm)" } },
       x: { title: { display: true, text: "Time" } },
     },
-    plugins: { legend: { display: false } },
   };
 
   // build leaflet icons for alerts
@@ -421,7 +428,6 @@ export default function FloodTracker() {
               <h2 className="text-lg font-bold text-gray-700 mb-2">Flood Map</h2>
               <div className="rounded-2xl overflow-hidden border border-green-100 bg-white" style={{ height: 360 }}>
                 <MapContainer
-                  // center/zoom are overridden by FitToData
                   center={[14.4875, 121.0075]}
                   zoom={16}
                   style={{ height: "100%", width: "100%" }}
@@ -467,7 +473,7 @@ export default function FloodTracker() {
                           <strong>{p.name}</strong><br />
                           {p.wl?.toFixed?.(2) ?? p.wl} cm •{" "}
                           <span style={{ color: p.color, fontWeight: "bold" }}>{p.level}</span><br />
-                          <small>{p.updated ? formatTimestamp(p.updated) : "-"}</small>
+                          <small>{formatTimestamp(p.updated)}</small>
                         </Popup>
                       </CircleMarker>
                       {p.level === "High" && (
@@ -476,25 +482,30 @@ export default function FloodTracker() {
                     </React.Fragment>
                   ))}
 
-                  {/* Alerts (user reports) */}
-                  {alerts.map((alert, i) => (
-                    <Marker
-                      key={`alert-${i}`}
-                      position={[parseFloat(alert.lat), parseFloat(alert.lng)]}
-                      icon={getAlertIcon(alert.severity)}
-                    >
-                      <Popup>
-                        <strong>{alert.location}</strong><br />
-                        {alert.description}<br />
-                        <span style={{ color: getSeverityColor(alert.severity), fontWeight: "bold" }}>
-                          Severity: {alert.severity}
-                        </span><br />
-                        {formatTimestamp(alert.timestamp)}
-                      </Popup>
-                    </Marker>
-                  ))}
+                  {/* Alerts (user reports) — READ from coordinates; skip invalid */}
+                  {alerts.map((alert, i) => {
+                    const lat = Number(alert?.coordinates?.lat);
+                    const lng = Number(alert?.coordinates?.lng);
+                    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+                    return (
+                      <Marker
+                        key={`alert-${i}`}
+                        position={[lat, lng]}
+                        icon={getAlertIcon(alert.severity)}
+                      >
+                        <Popup>
+                          <strong>{alert.location}</strong><br />
+                          {alert.description}<br />
+                          <span style={{ color: getSeverityColor(alert.severity), fontWeight: "bold" }}>
+                            Severity: {alert.severity}
+                          </span><br />
+                          {formatTimestamp(alert.timestamp || alert.createdAt)}
+                        </Popup>
+                      </Marker>
+                    );
+                  })}
 
-                  {/* Hotspots (orange/red) -> this is your “red map area index” */}
+                  {/* Hotspots (orange/red) */}
                   {hotspots.map((h, i) => {
                     const lat = Number(h.coordinates?.lat);
                     const lng = Number(h.coordinates?.lng);
@@ -521,7 +532,10 @@ export default function FloodTracker() {
                     village={VILLAGE_LINE}
                     pins={FIXED_PINS}
                     hotspots={hotspots.map(h => ({ lat: Number(h.coordinates?.lat), lng: Number(h.coordinates?.lng) }))}
-                    alerts={alerts}
+                    alerts={alerts.map(a => ({
+                      lat: Number(a?.coordinates?.lat),
+                      lng: Number(a?.coordinates?.lng)
+                    }))}
                   />
                 </MapContainer>
               </div>
@@ -556,7 +570,7 @@ export default function FloodTracker() {
                     <span><strong>Battery:</strong> {sensor.batteryLevel}%</span>
                     <span><strong>Signal:</strong> {sensor.signalStrength}</span>
                     <span><strong>Status:</strong> {sensor.status}</span>
-                    <span><strong>Last Updated:</strong> {sensor.lastUpdated ? formatTimestamp(sensor.lastUpdated) : "N/A"}</span>
+                    <span><strong>Last Updated:</strong> {formatTimestamp(sensor.lastUpdated)}</span>
                     <span>
                       <strong>Flood Level:</strong>{" "}
                       <span
