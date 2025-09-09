@@ -5,8 +5,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import axios from "axios";
 import { io } from "socket.io-client";
+import { useNavigate } from "react-router-dom";    
 
-// ─── SAME RED MARKER ──────────────────────────────────────────────
 const redMarker = L.icon({
   iconUrl:
     "https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-red.png",
@@ -18,7 +18,6 @@ const redMarker = L.icon({
   shadowSize: [41, 41],
 });
 
-// ─── MULTI BOUNDARY (gaya ng nasa FloodTracker mo) ───────────────
 const geojsonLineString = [
   [14.494416374245276, 121.00305909128258],
   [14.494081134506985, 121.00369914809767],
@@ -56,51 +55,59 @@ const geojsonPoints = [
   [14.491841264691814, 121.00829594057382],
 ];
 
-// ─── helper: point-in-polygon (ray casting) ──────────────────────
-function insidePolygon(lat, lng, ring) {
-  // ring: [[lat,lng], ...] (closed or open)
-  let x = lng, y = lat;
-  let inside = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const xi = ring[i][1], yi = ring[i][0];
-    const xj = ring[j][1], yj = ring[j][0];
-    const intersect =
-      yi > y !== yj > y &&
-      x < ((xj - xi) * (y - yi)) / (yj - yi + 0.0) + xi;
-    if (intersect) inside = !inside;
-  }
-  return inside;
-}
-
 const severityBadge = (sev = "low") => {
   const s = String(sev || "").toLowerCase();
-  const color =
-    s === "high" ? "#dc2626" : s === "medium" ? "#d97706" : "#059669";
-  return (
-    <span style={{ color, fontWeight: 700 }}>
-      Severity: {s ? s[0].toUpperCase() + s.slice(1) : "Low"}
-    </span>
-  );
+  const color = s === "high" ? "#dc2626" : s === "medium" ? "#d97706" : "#059669";
+  return <span style={{ color, fontWeight: 700 }}>
+    Severity: {s ? s[0].toUpperCase() + s.slice(1) : "Low"}
+  </span>;
 };
+
+// client-only reverse geocode for display
+async function reverseGeocode(lat, lon) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&zoom=17&addressdetails=1`,
+      { headers: { Accept: "application/json", "User-Agent": "CommuniSafe/1.0" } }
+    );
+    if (!res.ok) throw new Error();
+    const j = await res.json();
+    return j.display_name || `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  } catch {
+    return `${Number(lat).toFixed(5)}, ${Number(lon).toFixed(5)}`;
+  }
+}
 
 export default function SOSMonitorModal({ open, onClose, API_URL, token, notify }) {
   const [items, setItems] = useState([]);
-  const [center, setCenter] = useState([14.4875, 121.0075]); // loob ng Multi
+  const [center, setCenter] = useState([14.4875, 121.0075]);
   const mapRef = useRef(null);
   const socketRef = useRef(null);
+  const navigate = useNavigate();    
 
   const auth = useMemo(
     () => ({ headers: { Authorization: `Bearer ${token}` } }),
     [token]
   );
 
+  // Fetch actives and enrich with displayLocation
   const loadSOS = async () => {
     try {
-     
       const { data } = await axios.get(`${API_URL}/api/sos/active`, auth);
-      setItems(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      const enriched = await Promise.all(
+        list.map(async (it) => {
+          const displayLocation =
+            Number(it.latitude) && Number(it.longitude)
+              ? await reverseGeocode(it.latitude, it.longitude)
+              : "Unknown location";
+          return { ...it, displayLocation };
+        })
+      );
+      setItems(enriched);
     } catch (e) {
       console.error("SOS fetch failed:", e);
+      setItems([]);
     }
   };
 
@@ -109,30 +116,48 @@ export default function SOSMonitorModal({ open, onClose, API_URL, token, notify 
     socketRef.current = io(API_URL, { transports: ["websocket"], path: "/socket.io/" });
     const s = socketRef.current;
 
-    const onNew = (a) => {
-  
+    const onNew = async (a) => {
+      // backend emits: { id, name, latitude, longitude, timestamp, respondersCount }
+      const displayLocation =
+        Number(a?.latitude) && Number(a?.longitude)
+          ? await reverseGeocode(a.latitude, a.longitude)
+          : "Unknown location";
+      const enriched = { ...a, displayLocation };
+      setItems((prev) => [enriched, ...prev]);
+      notify?.({
+        title: "🚨 New SOS",
+        body: `${enriched?.name || "Resident"} needs help`,
+        icon: "/favicon.ico",
+        url: "/incidentreport",
+      });
+      if (enriched?.latitude && enriched?.longitude) {
+        const c = [enriched.latitude, enriched.longitude];
+        setCenter(c);
+        mapRef.current?.flyTo(c, 17);
+      }
+    };
 
-  setItems(prev => [a, ...prev]);
-  notify?.({
-    title: "🚨 New SOS",
-    body: `${a?.name || "Resident"} needs help`,
-    icon: "/favicon.ico",
-    url: "/incidentreport",
-  });
-  if (a?.latitude && a?.longitude) {
-    setCenter([a.latitude, a.longitude]);
-    mapRef.current?.flyTo([a.latitude, a.longitude], 17);
-  }
- };
     const onResolved = ({ id }) =>
-      setItems((prev) => prev.filter((x) => String(x.id || x._id) !== String(id)));
+      setItems((prev) => prev.filter((x) => String(x.id) !== String(id)));
+
+    // RESPONDER event name from your backend:
+    const onRespond = ({ id, status }) =>
+      setItems((prev) =>
+        prev.map((x) =>
+          String(x.id) === String(id)
+            ? { ...x, lastResponderStatus: status } // for UI if you want
+            : x
+        )
+      );
 
     s.on("sos:new", onNew);
     s.on("sos:resolved", onResolved);
+    s.on("sos:respond", onRespond);
 
     return () => {
       s.off("sos:new", onNew);
       s.off("sos:resolved", onResolved);
+      s.off("sos:respond", onRespond);
       s.disconnect();
     };
   }, [open, API_URL, notify]);
@@ -142,17 +167,65 @@ export default function SOSMonitorModal({ open, onClose, API_URL, token, notify 
   }, [open]); // eslint-disable-line
 
   const focus = (lat, lng) => {
-    setCenter([lat, lng]);
-    const map = mapRef.current;
-    if (map && typeof map.flyTo === "function") map.flyTo([lat, lng], 17);
+    const c = [lat, lng];
+    setCenter(c);
+    mapRef.current?.flyTo(c, 17);
+  };
+
+  // ✅ Respond -> PUT /api/sos/:id/respond  { status: 'responding' }
+  const handleRespond = async (item) => {
+    try {
+      await axios.put(
+        `${API_URL}/api/sos/${item.id}/respond`,
+        { status: "responding" },
+        auth
+      );
+      setItems((prev) =>
+        prev.map((x) => (String(x.id) === String(item.id) ? { ...x, lastResponderStatus: "responding" } : x))
+      );
+      notify?.({
+        title: "🚑 Responding",
+        body: `Marked as responding to ${item?.name || "SOS"}.`,
+        icon: "/favicon.ico",
+      });
+    } catch (err) {
+      console.error("Respond failed:", err?.response?.data || err.message);
+      alert(
+        `Failed to mark as responding.\n` +
+          (err?.response?.data?.error ? `Server: ${err.response.data.error}` : "Check your token/CORS and route.")
+      );
+    }
+  };
+
+  // Optional: Resolve -> PUT /api/sos/:id/resolve  { code? }
+  const handleResolve = async (item) => {
+    try {
+      await axios.put(`${API_URL}/api/sos/${item.id}/resolve`, {}, auth);
+      setItems((prev) => prev.filter((x) => String(x.id) !== String(item.id)));
+      notify?.({ title: "✅ Resolved", body: "SOS marked safe.", icon: "/favicon.ico" });
+      onClose?.();
+      navigate("/incidentarchive"); // ⬅️ go to Incident Archive
+    } catch (err) {
+      console.error("Resolve failed:", err?.response?.data || err.message);
+      alert(`Failed to resolve SOS.`);
+    }
   };
 
   if (!open) return null;
 
-  // filter markers to those INSIDE Multi polygon
   const itemsDisplay = items.filter(
-   (x) => Number.isFinite(Number(x.latitude)) && Number.isFinite(Number(x.longitude))
- );
+    (x) => Number.isFinite(Number(x.latitude)) && Number.isFinite(Number(x.longitude))
+  );
+
+  const StatusPill = ({ s }) => (
+    <span
+      className={`text-xs px-2 py-0.5 rounded-md ${
+        s === "responding" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
+      }`}
+    >
+      {s === "responding" ? "Responding" : "Pending"}
+    </span>
+  );
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -161,29 +234,34 @@ export default function SOSMonitorModal({ open, onClose, API_URL, token, notify 
         style={{ width: "95vw", maxWidth: 1100, padding: 0, overflow: "hidden" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-3 border-b">
+        <div className="flex items-center justify-between px-5 py-3 border-b bg-white">
           <h2 className="text-lg font-semibold text-red-600">🚨 SOS Monitor</h2>
           <button className="text-xl text-gray-500" onClick={onClose}>×</button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3" style={{ minHeight: 520 }}>
           {/* LEFT: list */}
-          <div className="border-r md:col-span-1 p-3 overflow-y-auto">
+          <div className="border-r md:col-span-1 p-3 overflow-y-auto bg-white">
             {itemsDisplay.length === 0 ? (
-              <div className="text-gray-500 text-sm">No active SOS inside Multi.</div>
+              <div className="text-gray-500 text-sm">No active SOS.</div>
             ) : (
               itemsDisplay.map((it) => (
-                <button key={it.id || it._id}
-                  className="w-full text-left p-3 mb-2 rounded-lg hover:bg-red-50 border"
-                  onClick={() => it.latitude && it.longitude && focus(it.latitude, it.longitude)}
+                <div
+                  key={it.id}
+                  className="w-full text-left p-3 mb-2 rounded-lg border hover:bg-red-50 transition"
                 >
-                  <div className="font-semibold text-gray-800">{it.name || "Unknown"}</div>
-                  <div className="text-xs text-gray-600 mb-1">
-                    {(it.location && String(it.location)) || "Unknown location"}
+                  <div className="font-semibold text-gray-800">
+                    {it.name || "Unknown"}
                   </div>
-                  <div className="text-xs">{severityBadge(it.severity)}</div>
-                  <div className="text-xs text-gray-500">
-                    {new Date(it.createdAt || it.date || Date.now()).toLocaleString(undefined, {
+
+                  <div className="text-xs text-gray-600 mb-1">
+                    {it.displayLocation || "Unknown location"}
+                  </div>
+
+                  <div className="text-xs mb-1">{severityBadge(it.severity)}</div>
+
+                  <div className="text-xs text-gray-500 mb-2">
+                    {new Date(it.timestamp || Date.now()).toLocaleString(undefined, {
                       month: "short",
                       day: "numeric",
                       year: "numeric",
@@ -191,7 +269,27 @@ export default function SOSMonitorModal({ open, onClose, API_URL, token, notify 
                       minute: "2-digit",
                     })}
                   </div>
-                </button>
+
+                  <div className="flex gap-2">
+                    <button
+                      className="px-3 py-1 rounded-md text-white"
+                      style={{ background: "#16a34a" }}
+                      onClick={() => {
+                        if (it.latitude && it.longitude) focus(it.latitude, it.longitude);
+                        handleRespond(it);
+                      }}
+                    >
+                      Respond
+                    </button>
+                   
+                    <button
+                      className="px-3 py-1 rounded-md border"
+                      onClick={() => handleResolve(it)}
+                    >
+                      Resolve
+                    </button>
+                  </div>
+                </div>
               ))
             )}
           </div>
@@ -210,20 +308,15 @@ export default function SOSMonitorModal({ open, onClose, API_URL, token, notify 
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
 
-              {/* 🔵 boundary line gaya ng FloodTracker */}
-              <Polyline
-                positions={geojsonLineString}
-                pathOptions={{ color: "blue", weight: 4, dashArray: "6 8" }}
-              />
+              <Polyline positions={geojsonLineString} pathOptions={{ color: "blue", weight: 4, dashArray: "6 8" }} />
               {geojsonPoints.map((pos, idx) => (
                 <Marker key={`g${idx}`} position={pos} />
               ))}
 
-              {/* 🔴 SOS markers (inside Multi lang) */}
               {itemsDisplay.map((x) => (
-                <Marker key={x.id || x._id} position={[x.latitude, x.longitude]} icon={redMarker}>
+                <Marker key={x.id} position={[x.latitude, x.longitude]} icon={redMarker}>
                   <Popup>
-                    <div style={{ minWidth: 180 }}>
+                    <div style={{ minWidth: 200 }}>
                       <div style={{ fontWeight: 700 }}>{x.name || "Unknown"}</div>
                       <div className="text-xs" style={{ marginBottom: 4 }}>
                         {x.description || x.message || "SOS Request"}
@@ -231,14 +324,28 @@ export default function SOSMonitorModal({ open, onClose, API_URL, token, notify 
                       <div className="text-xs" style={{ marginBottom: 4 }}>
                         {severityBadge(x.severity)}
                       </div>
-                      <div className="text-xs" style={{ color: "#6b7280" }}>
-                        {new Date(x.createdAt || x.date || Date.now()).toLocaleString(undefined, {
+                      <div className="text-xs" style={{ marginBottom: 6 }}>
+                        <span className="font-semibold">Location:</span>{" "}
+                        {x.displayLocation || "Unknown location"}
+                      </div>
+                      <div className="text-xs" style={{ color: "#6b7280", marginBottom: 8 }}>
+                        {new Date(x.timestamp || Date.now()).toLocaleString(undefined, {
                           month: "short",
                           day: "numeric",
                           year: "numeric",
                           hour: "numeric",
                           minute: "2-digit",
                         })}
+                      </div>
+
+                      <div className="flex gap-6">
+                        <button className="px-3 py-1 rounded-md text-white" style={{ background: "#16a34a" }} onClick={() => handleRespond(x)}>
+                          Respond
+                        </button>
+                       
+                        <button className="px-3 py-1 rounded-md border" onClick={() => handleResolve(x)}>
+                          Resolve
+                        </button>
                       </div>
                     </div>
                   </Popup>
