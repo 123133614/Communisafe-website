@@ -9,10 +9,18 @@ const API_URL =
 
   axios.defaults.baseURL = API_URL;
 
-  const photoUrlFromKey = (key) =>
-  key
-    ? `${API_URL}/api/files/signed-url?key=${encodeURIComponent(key)}`
+const photoUrlFromKey = (p) => {
+  if (!p) return `${process.env.PUBLIC_URL}/assets/multiico.png`;
+
+  if (typeof p === "string" && /^https?:\/\//i.test(p)) return p;
+
+  const key = typeof p === "string" ? p : p.key || p.path || p.fileKey;
+  return key
+    ? `${API_URL}/api/files/signed-url-redirect?key=${encodeURIComponent(key)}`
     : `${process.env.PUBLIC_URL}/assets/multiico.png`;
+};
+
+
 
 
 export default function IncidentArchive() {
@@ -201,33 +209,29 @@ export default function IncidentArchive() {
         {/* Right: Photos */}
         <div className="ia-modal-photos">
           <div className="section-title">Attached Photos</div>
-          {selectedIncident.photos?.length > 0 ? (
-            <div className="photo-grid">
-              {selectedIncident.photos.map((p, i) => {
-                const url = photoUrlFromKey(p);
-                return (
-                  <a
-                    key={i}
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="photo-link"
-                    title="Open full size"
-                  >
-                    <img
-                      src={url}
-                      alt={`incident-${i}`}
-                      onError={(e) => {
-                        e.currentTarget.src = `${process.env.PUBLIC_URL}/assets/multiico.png`;
-                      }}
-                    />
-                  </a>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="empty-photos">No photos attached.</div>
-          )}
+         {selectedIncident.photos?.length > 0 ? (
+  <div className="photo-grid">
+    {selectedIncident.photos.map((p, i) => {
+      console.log("Photo object:", p);
+      const url = photoUrlFromKey(p);
+      console.log("Generated URL:", url);
+      return (
+        <a key={i} href={url} target="_blank" rel="noreferrer" className="photo-link" title="Open full size">
+          <img
+            src={url}
+            alt={`incident-${i}`}
+            onError={(e) => {
+              e.currentTarget.src = `${process.env.PUBLIC_URL}/assets/multiico.png`;
+            }}
+          />
+        </a>
+      );
+    })}
+  </div>
+) : (
+  <div className="empty-photos">No photos attached.</div>
+)}
+
         </div>
       </div>
 
