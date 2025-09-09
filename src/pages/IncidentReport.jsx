@@ -312,7 +312,7 @@ export default function IncidentReport() {
 // add with your other useState/useEffect
 const [activeIdx, setActiveIdx] = useState(0);
 const [imgLoaded, setImgLoaded] = useState(true);
-// map of { key: presignedUrl }
+
 const [signedUrlMap, setSignedUrlMap] = useState({});
 
 
