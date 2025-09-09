@@ -46,11 +46,7 @@ export const photoUrlFromKey = (key, expires = 600, map) => {
 
 
 
-const socket = io(API_URL, {
-  path: "/socket.io",
-  transports: ["websocket", "polling"], 
-});
-
+const socket = io(API_URL, { transports: ['websocket'], path: '/socket.io/' });
 
 
 // ─── Fix Leaflet marker icon paths ────────────────────────────────────────
@@ -496,39 +492,30 @@ useEffect(() => {
 
   // If URL has an ID, fetch that single incident
   useEffect(() => {
-  if (!id) { setIncident(null); setLoading(false); return; }
-
-  const fetchIncident = async () => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem("token");
-      const res = await axios.get(`/api/incidents/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setIncident(res.data.incident);
-    } catch {
+    if (!id) {
       setIncident(null);
+      setLoading(false);
+      return;
     }
-    setLoading(false);
-  };
-  fetchIncident();
-}, [id]);
-
+    const fetchIncident = async () => {
+      setLoading(true);
+      try {
+        const res = await axios.get(`${API_URL}/api/incidents/${id}`);
+        setIncident(res.data.incident);
+      } catch {
+        setIncident(null);
+      }
+      setLoading(false);
+    };
+    fetchIncident();
+  }, [id]);
 
   // Handle file input change
-const handleFileChange = (e) => {
-  const files = Array.from(e.target.files);
-  setFormData((prev) => ({ ...prev, image: files }));
-  const urls = files.map((f) => URL.createObjectURL(f));
-  setSelectedImage(urls);
-};
-
-useEffect(() => {
-  return () => {
-    selectedImage?.forEach((u) => URL.revokeObjectURL(u));
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    setFormData((prev) => ({ ...prev, image: files }));
+    setSelectedImage(files.map((file) => URL.createObjectURL(file)));
   };
-}, [selectedImage]);
-
 
   // Submit a new incident
   const handleAddIncident = async () => {
@@ -906,8 +893,9 @@ useEffect(() => {
     </div>
   </div>
 </div>
- </div>
-)}
+
+          </div>
+        )}
 
         {/* Map Modal */}
         <IncidentMapModal open={!!mapModalIncident} onClose={() => setMapModalIncident(null)} incident={mapModalIncident || {}} />
