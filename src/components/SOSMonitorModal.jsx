@@ -17,6 +17,17 @@ const redMarker = L.icon({
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
 });
+const blueMarker = L.icon({
+  iconUrl:
+    "https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-blue.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
 
 const geojsonLineString = [
   [14.494416374245276, 121.00305909128258],
@@ -310,8 +321,11 @@ export default function SOSMonitorModal({ open, onClose, API_URL, token, notify 
 
               <Polyline positions={geojsonLineString} pathOptions={{ color: "blue", weight: 4, dashArray: "6 8" }} />
               {geojsonPoints.map((pos, idx) => (
-                <Marker key={`g${idx}`} position={pos} />
-              ))}
+  <Marker key={`g${idx}`} position={pos} icon={blueMarker}>
+    <Popup>Checkpoint {idx + 1}</Popup>
+  </Marker>
+))}
+
 
               {itemsDisplay.map((x) => (
                 <Marker key={x.id} position={[x.latitude, x.longitude]} icon={redMarker}>
