@@ -48,7 +48,7 @@ export const photoUrlFromKey = (key, expires = 600, map) => {
 
 const socket = io(API_URL, {
   path: "/socket.io",
-  transports: ["websocket", "polling"], // add polling fallback
+  transports: ["websocket", "polling"], 
 });
 
 
