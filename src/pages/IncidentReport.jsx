@@ -843,11 +843,17 @@ useEffect(() => {
 
     <div className="mt-auto flex flex-wrap gap-2 justify-end">
       <button
-        className="bg-blue-600 text-white px-4 py-1.5 rounded-full hover:bg-blue-700"
-        onClick={() => setChatModal({ open: true, incident: previewModal })}
-      >
-        Chat
-      </button>
+  className="bg-blue-600 text-white px-4 py-1.5 rounded-full hover:bg-blue-700"
+  onClick={() => {
+    // CLOSE preview first, then open Chat
+    const inc = previewModal;           // keep reference
+    setPreviewModal(null);              // <-- isara muna yung Preview Modal
+    setChatModal({ open: true, incident: inc }); // tapos buksan yung Chat Modal
+  }}
+>
+  Chat
+</button>
+
 
       {previewModal.status?.toLowerCase() !== "solved" &&
         previewModal.status?.toLowerCase() !== "resolved" && (
@@ -1025,16 +1031,17 @@ useEffect(() => {
       <SOSMonitorModal open={showSOSModal}  onClose={() => setShowSOSModal(false)} API_URL={API_URL} token={localStorage.getItem("token")}  notify={notify}/>
 
       {/* Chat Modal */}
-      {/* Chat Modal – professional */}
       {chatModal.open && (
-          <div className="modal-backdrop" onClick={() => setChatModal({ open: false, incident: null })}>
-             <div className="modal-content chat-pro" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} >
-              <ChatBox
-               incident={chatModal.incident}
-               onClose={() => setChatModal({ open: false, incident: null })}/>
-                </div>
-                </div>
-              )}
+        <div className="modal-backdrop" onClick={() => setChatModal({ open: false, incident: null })}>
+          <div className="modal-content chat-pro" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} >
+             <ChatBox
+              incident={chatModal.incident}
+               onClose={() => setChatModal({ open: false, incident: null })}
+      />
+    </div>
+  </div>
+)}
+
     </div>
   );
 }
@@ -1043,6 +1050,7 @@ function ChatBox({ incident, onClose }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const chatBodyRef = useRef(null);
+  const seenRef = useRef(new Set());
 
   // Try to identify current user for "fromSelf"
   const meId =
@@ -1072,61 +1080,97 @@ function ChatBox({ incident, onClose }) {
   }, [messages]);
 
   // Fetch history + join socket room
-  useEffect(() => {
-    if (!incident?._id) return;
+useEffect(() => {
+  if (!incident?._id) return;
 
-    const token = localStorage.getItem("token");
-    const config = { headers: { Authorization: `Bearer ${token}` } };
+  const token = localStorage.getItem("token");
+  const config = { headers: { Authorization: `Bearer ${token}` } };
 
-    // 1) Load history
-      axios.get(`/api/incidents/${incident._id}/chat`, config)
-      .then((res) => {
-        const raw = res.data?.messages || res.data || [];
-        setMessages(raw.map(normalize));
-      })
-      .catch(() => setMessages([]));
+  // seen set + short-time window for identical messages
+  // - seenRef: remembers ids/keys we've already added
+  // - lastSeenAtRef: throttles same (sender+text) within N ms
+  const lastSeenAtRef = { current: new Map() };
+  const WINDOW_MS = 5000; // ignore identical msg within 5s window
 
-    // 2) Join room & listen for incoming
-     socket.emit("join_incident_chat", { incidentId: incident._id })
+  const makeKey = (m) =>
+    m.clientMessageId ||
+    m.id ||
+    `${m.senderId || m.name}|${(m.text || "").trim().toLowerCase()}`;
 
-    const onIncoming = (payload) => {
-      // payload could be { message: {...} } or the message itself
-      const msg = payload?.message ?? payload;
-      setMessages((prev) => [...prev, normalize(msg)]);
-    };
+  axios
+    .get(`/api/incidents/${incident._id}/chat`, config)
+    .then((res) => {
+      const raw = res.data?.messages || res.data || [];
+      const norm = raw.map(normalize);
+      norm.forEach((m) =>
+        seenRef.current.add(m.id || makeKey(m))
+      );
+      setMessages(norm);
+    })
+    .catch(() => setMessages([]));
 
-    socket.on("receive_incident_message", onIncoming);
+  socket.emit("join_incident_chat", { incidentId: incident._id });
 
-    // Cleanup on unmount/close
-    return () => {
-       socket.off("receive_incident_message", onIncoming);
-    };
-  }, [incident?._id]);
+  const onIncoming = (payload) => {
+    const msg = normalize(payload?.message ?? payload);
+    const key = makeKey(msg);
 
-const sendMessage = async () => {
+    // 1) absolute dedupe: already seen id/key
+    if (seenRef.current.has(key)) return;
+
+    // 2) time-window dedupe: same sender+text within WINDOW_MS
+    const now = Date.now();
+    const last = lastSeenAtRef.current.get(key) || 0;
+    if (now - last < WINDOW_MS) return;
+    lastSeenAtRef.current.set(key, now);
+
+    // 3) avoid echo of our optimistic message (best-effort)
+    const isFromSelf =
+      msg.fromSelf || (msg.senderId && String(msg.senderId) === String(meId));
+    if (isFromSelf) {
+      const lastLocal = messages[messages.length - 1];
+      if (
+        lastLocal &&
+        lastLocal.text === msg.text &&
+        Math.abs(new Date(msg.time) - new Date(lastLocal.time)) < 3000
+      ) {
+        // treat as duplicate echo
+        return;
+      }
+    }
+
+    seenRef.current.add(key);
+    setMessages((prev) => [...prev, msg]);
+  };
+
+  // ☝️ ensure we don't accumulate duplicate handlers
+  socket.off("receive_incident_message", onIncoming);
+  socket.on("receive_incident_message", onIncoming);
+
+  return () => {
+    socket.off("receive_incident_message", onIncoming);
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [incident?._id]);
+
+
+
+const sendMessage = () => {
   const text = input.trim();
   if (!text) return;
 
-  // optimistic add
-  const localMsg = {
-    id: crypto.randomUUID(),
-    senderId: meId,
-    senderName: JSON.parse(localStorage.getItem("user"))?.name || "Me",
-    text,
-    createdAt: Date.now(),
-    fromSelf: true,
-  };
-  setMessages((prev) => [...prev, normalize(localMsg)]);
+  const clientMessageId = crypto.randomUUID();
   setInput("");
 
-  // tell the server to persist + broadcast
   socket.emit("send_incident_message", {
     incidentId: incident._id,
     senderId: meId,
-    senderName: localMsg.senderName,
+    senderName: JSON.parse(localStorage.getItem("user"))?.name || "Me",
     text,
+    clientMessageId,
   });
 };
+
 
 
   return (
@@ -1154,7 +1198,7 @@ const sendMessage = async () => {
       {!msg.fromSelf && (
         <img
           src={msg.avatar || "/default-avatar.png"}
-          alt={msg.name}
+          
           className="chat-avatar"
         />
       )}
