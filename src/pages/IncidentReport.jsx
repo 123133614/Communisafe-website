@@ -19,6 +19,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "../css/IncidentReport.css";
 import { io } from 'socket.io-client';
+import SOSMonitorModal from '../components/SOSMonitorModal';
 
 
 
@@ -27,16 +28,21 @@ const API_URL =
 
   axios.defaults.baseURL = API_URL;
 
-export const photoUrlFromKey = (key, expires = 600) => {
+export const photoUrlFromKey = (key, expires = 600, map) => {
   const fallback = `${process.env.PUBLIC_URL}/assets/multiico.png`;
   if (!key) return fallback;
 
+  // kung meron na tayong signed URL galing backend, gamitin iyon
+  if (map && map[key]) return map[key];
+
+  // legacy fallbacks
   const s = String(key).trim();
-  if (/^https?:\/\//i.test(s)) return s;                          // already a URL
-  if (s.startsWith('/uploads/')) return `${API_URL}${s}`;          // legacy absolute
-  if (s.startsWith('uploads/'))  return `${API_URL}/${s}`;         // legacy relative
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith('/uploads/')) return `${API_URL}${s}`;
+  if (s.startsWith('uploads/')) return `${API_URL}/${s}`;
   return `${API_URL}/api/files/signed-url-redirect?key=${encodeURIComponent(s)}&expires=${expires}`;
 };
+
 
 
 
@@ -290,6 +296,7 @@ function Sidebar() {
 export default function IncidentReport() {
   const { id } = useParams();
   const notify = useDesktopNotification();
+  const [showSOSModal, setShowSOSModal] = useState(false);
 
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -305,6 +312,9 @@ export default function IncidentReport() {
 // add with your other useState/useEffect
 const [activeIdx, setActiveIdx] = useState(0);
 const [imgLoaded, setImgLoaded] = useState(true);
+// map of { key: presignedUrl }
+const [signedUrlMap, setSignedUrlMap] = useState({});
+
 
 useEffect(() => {
   if (previewModal?._id) {
@@ -345,19 +355,77 @@ useEffect(() => {
 
   const [incidents, setIncidents] = useState([]);
 
-  useEffect(() => {
-    socket.on("newNotification", (data) => {
-      if (data.type === "incident") {
-        notify({
-          title: data.title,
-          body: data.body,
-          icon: "/favicon.ico",
-          url: "/incidentreport",
-        });
-      }
+// 👇 replace your current useEffect(...) notification block with this one
+useEffect(() => {
+  // avoid duplicate toasts if same event fires multiple times
+  const seen = new Set(); // keys like `${id}:${responderId}:${status}`
+
+  const onNotif = (data) => {
+    if (data?.type === 'incident' || data?.type === 'sos') {
+      notify({
+        title: data.title || (data.type === 'sos' ? '🚨 SOS Alert' : 'New Incident'),
+        body:  data.body  || (data.type === 'sos'
+          ? `${data.name || 'Resident'} needs help!`
+          : 'You have a new incident report'),
+        icon: '/favicon.ico',
+        url:  '/incidentreport'
+      });
+    }
+  };
+
+  // from /api/notifications (your existing pipe)
+  socket.on('newNotification', onNotif);
+
+  // direct realtime SOS (backend emits these in sosController)
+  socket.on('sos:new', (a) => {
+    notify({
+      title: '🚨 SOS Alert',
+      body:  `${a?.name || 'Resident'} needs help`,
+      icon:  '/favicon.ico',
+      url:   '/incidentreport'
     });
-    return () => socket.off("newNotification");
-  }, [notify]);
+  });
+
+  socket.on('sos:respond', ({ id, responder, status }) => {
+    const key = `${id}:${responder?.id || responder?._id}:${status}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    // human text
+    const who = responder?.name || 'An official';
+    const txt = status === 'responding'
+      ? `${who} is responding to an SOS`
+      : `${who} viewed an SOS`;
+
+    notify({
+      title: status === 'responding' ? '🚓 Responder On The Way' : '👀 SOS Viewed',
+      body:  txt,
+      icon:  '/favicon.ico',
+      url:   '/incidentreport'
+    });
+  });
+
+  socket.on('sos:resolved', ({ id }) => {
+    const key = `${id}:resolved`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      notify({
+        title: '✅ SOS Resolved',
+        body:  'An SOS has been marked as resolved.',
+        icon:  '/favicon.ico',
+        url:   '/incidentreport'
+      });
+    }
+  });
+
+  return () => {
+    socket.off('newNotification', onNotif);
+    socket.off('sos:new');
+    socket.off('sos:respond');
+    socket.off('sos:resolved');
+  };
+}, [notify]);
+
 
   // Populate initial formData and user info
   useEffect(() => {
@@ -384,13 +452,43 @@ useEffect(() => {
   }, []);
 
   // Fetch all incidents on mount
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    axios
-      .get(`${API_URL}/api/incidents`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((res) => setIncidents(res.data))
-      .catch((err) => console.error("Error fetching incidents:", err));
-  }, []);
+useEffect(() => {
+  const token = localStorage.getItem("token");
+
+  async function load() {
+    try {
+      const { data } = await axios.get(`${API_URL}/api/incidents`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setIncidents(data);
+
+      // collect unique S3 keys
+      const keys = [];
+      for (const inc of data) {
+        if (Array.isArray(inc.photos)) {
+          for (const k of inc.photos) if (k && !keys.includes(k)) keys.push(k);
+        }
+      }
+
+      if (keys.length) {
+        // batch sign from backend
+        const r = await axios.post(
+          `${API_URL}/api/files/signed-urls`,
+          { keys, expires: 600 },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const m = {};
+        (r.data?.urls || []).forEach(({ key, url }) => (m[key] = url));
+        setSignedUrlMap(m);
+      }
+    } catch (err) {
+      console.error("Error fetching incidents or signing URLs:", err);
+    }
+  }
+
+  load();
+}, []);
+
 
   // If URL has an ID, fetch that single incident
   useEffect(() => {
@@ -543,6 +641,8 @@ useEffect(() => {
     if (!incident) return <div className="text-center text-gray-500 mt-10">Incident not found.</div>;
   }
 
+
+
   return (
     <div className="appr-container">
       {/* Sidebar (green gradient w/ active white pill) */}
@@ -565,6 +665,10 @@ useEffect(() => {
                 <FiFilter size={18} />
               </button>
             </div>
+            <button 
+             className="ml-3 bg-red-600 text-white px-4 py-2 rounded-full hover:bg-red-700"
+               onClick={() => setShowSOSModal(true)}>  🚨 SOS Monitor </button>
+
             
           </div>
         </header>
@@ -680,10 +784,13 @@ useEffect(() => {
         setImgLoaded(true);
       }}
       src={photoUrlFromKey(
-        Array.isArray(previewModal?.photos) && previewModal.photos.length
-          ? previewModal.photos[Math.min(activeIdx, previewModal.photos.length - 1)]
-          : null
-      )}
+  Array.isArray(previewModal?.photos) && previewModal.photos.length
+    ? previewModal.photos[Math.min(activeIdx, previewModal.photos.length - 1)]
+    : null,
+  600,
+  signedUrlMap
+)}
+
       alt="Incident"
       className="object-contain w-full h-full select-none cursor-pointer"
       title="Click image or press → to view next"
@@ -808,7 +915,8 @@ useEffect(() => {
               minute: "2-digit",
             });
 
-           const photoUrl = photoUrlFromKey(inc?.photos?.[0]);
+           const photoUrl = photoUrlFromKey(inc?.photos?.[0], 600, signedUrlMap);
+
 
 
             return (
@@ -910,9 +1018,13 @@ useEffect(() => {
                 <FaLightbulb className="mt-1" /> Laging ihanda ang mga emergency supplies (flashlight, first aid kit, atbp).
               </div>
             </div>
+            
           </div>
+
+          
         </div>
       )}
+      <SOSMonitorModal open={showSOSModal}  onClose={() => setShowSOSModal(false)} API_URL={API_URL} token={localStorage.getItem("token")}  notify={notify}/>
 
       {/* Chat Modal */}
       {/* Chat Modal – professional */}
@@ -943,15 +1055,16 @@ function ChatBox({ incident, onClose }) {
 
   // Normalize any backend message to our UI shape
   const normalize = (m) => ({
-    id: m._id || m.id || crypto.randomUUID(),
-    name: m.senderName || m.name || m.userName || "User",
-    avatar: m.avatar || m.senderAvatar || "",
-    text: m.text ?? m.message ?? m.content ?? "",
-    time: m.time ?? m.createdAt ?? Date.now(),
-    fromSelf:
-      m.fromSelf ??
-      (m.senderId ? String(m.senderId) === String(meId) : false),
-  });
+  id: m._id || m.id || crypto.randomUUID(),
+  name: m.senderName || m.name || m.userName || "User",
+  avatar: m.avatar || m.senderAvatar || "",
+  text: m.text ?? m.message ?? m.content ?? "",
+  time: m.time ?? m.createdAt ?? Date.now(),
+  fromSelf:
+    m.fromSelf ??
+    (m.senderId ? String(m.senderId) === String(meId) : false),
+});
+
 
   // Auto-scroll to last message
   useEffect(() => {
@@ -968,8 +1081,7 @@ function ChatBox({ incident, onClose }) {
     const config = { headers: { Authorization: `Bearer ${token}` } };
 
     // 1) Load history
-    axios
-      .get(`/api/chat/${incident._id}`, config)
+      axios.get(`/api/incidents/${incident._id}/chat`, config)
       .then((res) => {
         const raw = res.data?.messages || res.data || [];
         setMessages(raw.map(normalize));
@@ -977,7 +1089,7 @@ function ChatBox({ incident, onClose }) {
       .catch(() => setMessages([]));
 
     // 2) Join room & listen for incoming
-    socket.emit("chat:join", { roomId: incident._id });
+     socket.emit("join_incident_chat", { incidentId: incident._id })
 
     const onIncoming = (payload) => {
       // payload could be { message: {...} } or the message itself
@@ -985,46 +1097,39 @@ function ChatBox({ incident, onClose }) {
       setMessages((prev) => [...prev, normalize(msg)]);
     };
 
-    socket.on("chat:newMessage", onIncoming);
+    socket.on("receive_incident_message", onIncoming);
 
     // Cleanup on unmount/close
     return () => {
-      socket.emit("chat:leave", { roomId: incident._id });
-      socket.off("chat:newMessage", onIncoming);
+       socket.off("receive_incident_message", onIncoming);
     };
   }, [incident?._id]);
 
-  const sendMessage = async () => {
-    const text = input.trim();
-    if (!text) return;
+const sendMessage = async () => {
+  const text = input.trim();
+  if (!text) return;
 
-    const token = localStorage.getItem("token");
-    const config = { headers: { Authorization: `Bearer ${token}` } };
-
-    try {
-      // Support backends expecting { text } OR { message }
-      const res = await axios.post(
-        `/api/chat/${incident._id}`,
-        { text, message: text },
-        config
-      );
-
-      const created =
-        res.data?.message || res.data?.data || res.data || { text, senderId: meId, createdAt: Date.now(), fromSelf: true };
-
-      // Optimistic update (normalized)
-      setMessages((prev) => [...prev, normalize({ ...created, fromSelf: true })]);
-      setInput("");
-
-      // Also emit via socket for other clients (if your backend doesn’t echo immediately)
-      socket.emit("chat:send", {
-        roomId: incident._id,
-        message: { text, senderId: meId, createdAt: Date.now() },
-      });
-    } catch (e) {
-      console.error("Send failed:", e);
-    }
+  // optimistic add
+  const localMsg = {
+    id: crypto.randomUUID(),
+    senderId: meId,
+    senderName: JSON.parse(localStorage.getItem("user"))?.name || "Me",
+    text,
+    createdAt: Date.now(),
+    fromSelf: true,
   };
+  setMessages((prev) => [...prev, normalize(localMsg)]);
+  setInput("");
+
+  // tell the server to persist + broadcast
+  socket.emit("send_incident_message", {
+    incidentId: incident._id,
+    senderId: meId,
+    senderName: localMsg.senderName,
+    text,
+  });
+};
+
 
   return (
     <div
