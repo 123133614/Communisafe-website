@@ -312,7 +312,7 @@ export default function IncidentReport() {
 // add with your other useState/useEffect
 const [activeIdx, setActiveIdx] = useState(0);
 const [imgLoaded, setImgLoaded] = useState(true);
-
+// map of { key: presignedUrl }
 const [signedUrlMap, setSignedUrlMap] = useState({});
 
 
@@ -783,14 +783,12 @@ useEffect(() => {
         e.currentTarget.src = `${process.env.PUBLIC_URL}/assets/multiico.png`;
         setImgLoaded(true);
       }}
-      src={photoUrlFromKey(
-  Array.isArray(previewModal?.photos) && previewModal.photos.length
-    ? previewModal.photos[Math.min(activeIdx, previewModal.photos.length - 1)]
-    : null,
-  600,
-  signedUrlMap
-)}
-
+       src={photoUrlFromKey( Array.isArray(previewModal?.photos) && previewModal.photos.length 
+        ? previewModal.photos[Math.min(activeIdx, previewModal.photos.length - 1)]
+        : null,
+        600,
+        signedUrlMap
+       )}
       alt="Incident"
       className="object-contain w-full h-full select-none cursor-pointer"
       title="Click image or press → to view next"
@@ -1170,8 +1168,6 @@ const sendMessage = async () => {
     </div>
   ))}
 </div>
-
-
       <div className="chat-messenger-input-row">
         <input
           className="chat-messenger-input"
