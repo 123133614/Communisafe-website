@@ -740,7 +740,7 @@ useEffect(() => {
           <th>Resident</th>
           <th>Visit Date</th>
           <th>Purpose</th>
-          <th>ID/Plate</th>
+          {/* <th>ID/Plate</th> */}
           <th>Mode</th>
           <th>Number</th>
           <th>Status</th>
@@ -767,7 +767,7 @@ useEffect(() => {
       <td>{v.resident || (v.requestedBy && (v.requestedBy.name || v.requestedBy.fullName)) || "-"}</td>
       <td>{visitDate ? visitDate.toLocaleString() : "-"}</td>
       <td>{v.purpose || "-"}</td>
-      <td>{v.idPresented || "-"}</td>
+      {/* <td>{v.idPresented || "-"}</td> */}
       <td>{v.modeOfArrival || "-"}</td>
       <td>{v.visitorNumber ? <span className="badge badge-number">#{v.visitorNumber}</span> : <span className="text-muted">—</span>}</td>
       <td>{statusBadge(v.status)}</td>
@@ -925,10 +925,10 @@ useEffect(() => {
             <dd className="cap">{selectedVisitor.modeOfArrival}</dd>
           </div>
 
-          <div className="row">
+          {/* <div className="row">
             <dt>{getIdFieldLabel(selectedVisitor.modeOfArrival)}</dt>
             <dd>{selectedVisitor.idPresented || "-"}</dd>
-          </div>
+          </div> */}
 
           <div className="row">
             <dt>Visitor Number</dt>
@@ -1128,9 +1128,7 @@ useEffect(() => {
   );
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Small utilities
-// ────────────────────────────────────────────────────────────────────────────
+
 function csvEscape(s) {
   const str = `${s ?? ""}`;
   if (/[",\n]/.test(str)) {
