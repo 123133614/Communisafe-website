@@ -1,6 +1,7 @@
 // src/components/FloodTracker.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { io } from "socket.io-client";
 import useDesktopNotification from "../hooks/useDesktopNotification";
 // src/components/FloodTracker.jsx
 import FloodReadingsTable from "./FloodReadingsTable"; // ⬅️ ADD THIS
@@ -35,6 +36,11 @@ import {
 ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend);
 
 const API_URL = process.env.REACT_APP_API_URL || "https://communisafe-backend.onrender.com";
+
+const getAuthHeaders = () => {
+  const t = localStorage.getItem("token");
+  return t ? { Authorization: `Bearer ${t}` } : {};
+};
 
 
 const geojsonLineString = [
@@ -207,10 +213,13 @@ export default function FloodTracker() {
   const canReport = role === "security" || role === "official";
   const token = localStorage.getItem("token");
   // history for the chart (time-series)
-const [series, setSeries] = useState([]);   // cm values
-const [labels, setLabels] = useState([]);   // time strings
-const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
-
+  const [series, setSeries] = useState([]); 
+  const [labels, setLabels] = useState([]); 
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+  const MAX_POINTS = 60;
+  const socketRef = useRef(null);
+  const lastTsRef = useRef(0); 
+  
   
 
   const [floodSensors, setFloodSensors] = useState([]);
@@ -218,75 +227,110 @@ const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
   const [timestamps, setTimestamps] = useState([]);
   
 
-  // Fetch sensor data every 5s
-  useEffect(() => {
-    const fetchSensorData = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/flood/sensors`, { headers: authHeaders });
-        setFloodSensors(res.data);
-        const sorted = [...res.data].sort((a, b) => new Date(a.lastUpdated) - new Date(b.lastUpdated));
-        setWaterLevels(sorted.map((s) => s.waterLevel));
-        setTimestamps(sorted.map((s) => new Date(s.lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })));
-      } catch (e) {
-        console.error("Error fetching flood sensor data:", e);
-      }
-    };
-    fetchSensorData();
-    const id = setInterval(fetchSensorData, 5000);
-    return () => clearInterval(id);
-  }, []);
 
-  // fetch 1st sensor + alerts
-  useEffect(() => {
-    axios
-      .get(`${API_URL}/api/flood/sensors`, { headers: authHeaders })
-      .then((res) => res.data?.length && setSensor(res.data[0]))
-      .catch(() => {});
 
-    axios
-      .get(`${API_URL}/api/flood/reports`, { headers: authHeaders })
-      .then((res) => setAlerts(res.data))
-      .catch(() => {});
-  }, []);
-  // Load latest readings for the currently selected sensor (every 5s)
+ const pushPoint = (value, ts = Date.now()) => {
+  const t = typeof ts === "string" ? Date.parse(ts) : ts;
+  const rounded = Math.floor(t / 1000); // round to the second
+  if (rounded === lastTsRef.current) return; // avoid adding duplicate data
+  lastTsRef.current = rounded;
+
+  setSeries((prev) => {
+    const next = [...prev, Number(value || 0)];
+    return next.length > MAX_POINTS ? next.slice(next.length - MAX_POINTS) : next;
+  });
+  setLabels((prev) => {
+    const next = [
+      ...prev,
+      new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    ];
+    return next.length > MAX_POINTS ? next.slice(next.length - MAX_POINTS) : next;
+  });
+};
+
 useEffect(() => {
   if (!sensor?._id) return;
-
   let stop = false;
+  setSeries([]); // Clear old data before loading new ones
+  setLabels([]);
+  lastTsRef.current = 0;
 
   const load = async () => {
     try {
-     
       const res = await axios.get(`${API_URL}/api/flood/readings`, {
         params: { sensorId: sensor._id, page: 1, limit: 60 },
-         headers: authHeaders,
+        headers: getAuthHeaders(),
       });
       if (stop) return;
-      const items = (res.data.items || []).slice().reverse(); // oldest→newest
-      setSeries(items.map(r => Number(r.waterLevel || 0)));
-      setLabels(items.map(r =>
-        new Date(r.recordedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-      ));
+      const items = (res.data.items || []).slice().reverse(); // oldest → newest
+      setSeries(items.map((r) => Number(r.waterLevel || 0)));
+      setLabels(
+        items.map((r) =>
+          new Date(r.recordedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+        )
+      );
+      // Update deduplication reference to the last record timestamp
+      if (items.length) {
+        lastTsRef.current = Math.floor(new Date(items[items.length - 1].recordedAt).getTime() / 1000);
+      }
     } catch (e) {
-      console.error("readings load error:", e);
+      console.error("readings load error:", e?.response?.status || e.message);
     }
   };
 
   load();
   const id = setInterval(load, 5000);
-  return () => { stop = true; clearInterval(id); };
-}, [sensor?._id, token]);
+  return () => {
+    stop = true;
+    clearInterval(id);
+  };
+}, [sensor?._id, API_URL]);
 
+useEffect(() => {
+  if (!sensor?._id) return;
+  // Close any previous socket
+  if (socketRef.current) {
+    try {
+      socketRef.current.close();
+    } catch {}
+  }
 
-  useEffect(() => {
-    const id = setInterval(() => {
-      axios
-        .get(`${API_URL}/api/flood/sensors`, { headers: authHeaders })
-        .then((res) => res.data?.length && setSensor(res.data[0]))
-        .catch(() => {});
-    }, 10000);
-    return () => clearInterval(id);
-  }, []);
+  const socket = io(API_URL, {
+    path: "/socket.io/",
+    transports: ["websocket"],
+    withCredentials: true,
+  });
+  socketRef.current = socket;
+
+  socket.on("connect", () => {
+    // console.log("WS connected", socket.id);
+  });
+
+  socket.on("sensor_data_updated", (payload) => {
+    try {
+      if (!payload?._id) return;
+      if (String(payload._id) !== String(sensor._id)) return; // only track the active sensor
+      // Update the sensor state
+      setSensor((prev) => ({ ...(prev || {}), ...payload }));
+      // Push the new point to the chart instantly
+      pushPoint(payload.waterLevel, payload.lastUpdated || Date.now());
+    } catch (e) {
+      console.warn("sensor_data_updated parse error:", e);
+    }
+  });
+
+  socket.on("disconnect", () => {
+    // console.log("WS disconnected");
+  });
+
+  return () => {
+    try {
+      socket.close();
+    } catch {}
+    socketRef.current = null;
+  };
+}, [sensor?._id, API_URL]);
+
 
   // Submit flood report
   const handleReportSubmit = async (e) => {
@@ -297,12 +341,14 @@ useEffect(() => {
 
     try {
       const payload = { severity: newAlert.severity, location: newAlert.location, description: newAlert.description, contact: newAlert.contact,  coordinates: { lat: latNum, lng: lngNum },};
-      await axios.post(`${API_URL}/api/flood/reports`, payload, { headers: authHeaders });
+      await axios.post(`${API_URL}/api/flood/reports`, payload, { headers: getAuthHeaders() }
+);
 
       setShowModal(false);
       setNewAlert({ location: "", severity: "", description: "", contact: "", timestamp: "", lat: "", lng: "" });
 
-      const res = await axios.get(`${API_URL}/api/flood/reports`, { headers: authHeaders })
+      const res = await axios.get(`${API_URL}/api/flood/reports`, { headers: getAuthHeaders() }
+)
 ;
       setAlerts(res.data);
     } catch (err) {
@@ -339,7 +385,7 @@ const chartData = {
   datasets: [
     {
       label: "Water Level (cm)",
-      data: series, // galing sa readings history
+      data: series.length ? series : [0],
       borderWidth: 3,
       tension: 0.3,
       pointRadius: 0,
