@@ -20,7 +20,7 @@ import "leaflet/dist/leaflet.css";
 import "../css/IncidentReport.css";
 import { io } from 'socket.io-client';
 import SOSMonitorModal from '../components/SOSMonitorModal';
-
+import { FaUserCircle } from "react-icons/fa";
 
 
 const API_URL =
@@ -1196,12 +1196,8 @@ const sendMessage = () => {
       className={`chat-bubble-row ${msg.fromSelf ? "chat-bubble-self" : "chat-bubble-user"}`}
     >
       {!msg.fromSelf && (
-        <img
-          src={msg.avatar || "/default-avatar.png"}
-          
-          className="chat-avatar"
-        />
-      )}
+  <FaUserCircle size={32} className="text-gray-400 mr-2" />
+)}
       <div className="chat-bubble">
         {!msg.fromSelf && <div className="chat-name">{msg.name}</div>}
         {msg.text}
