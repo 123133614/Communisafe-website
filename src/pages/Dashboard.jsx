@@ -42,6 +42,18 @@ function getAnnouncementAuthor(a = {}) {
   return role ? `${name} (${role})` : name;
 }
 
+function getAnnouncementLocations(a = {}) {
+  const raw =
+    a.location ?? a.locations ?? a.place ?? a.area ?? a.address ?? null;
+
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.filter(Boolean).map(s => String(s).trim());
+  if (typeof raw === "string")
+    return raw.split(",").map(s => s.trim()).filter(Boolean);
+  return [];
+}
+
+
 
 export default function Dashboard() {
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -456,15 +468,28 @@ export default function Dashboard() {
             >
               {/* Text */}
               <div className="flex flex-col justify-between p-6 flex-1">
-                <p className="text-xs font-medium text-gray-500 mb-1">
-                  {announcements[0].category}
-                </p>
+               <p className="text-xs font-medium mb-1 flex items-center gap-2">
+                 <span className="text-gray-500">{announcements[0].category}</span>
+                  {(announcements[0].urgent || (announcements[0].category || "").toLowerCase() === "urgent") && (
+                     <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded inline-flex items-center gap-1">
+                      <span aria-hidden>❗</span> URGENT </span>)}</p>
+
                 <h3 className="text-2xl font-bold text-gray-800 mb-2">
                   {announcements[0].title}
                 </h3>
                 <p className="text-sm text-gray-600 mb-4 whitespace-pre-line">
                   {announcements[0].description}
                 </p>
+
+                {(() => {const locs = getAnnouncementLocations(announcements[0]);
+                return (locs.length > 0 && (
+                <div className="dash-loc"><span className="dash-loc-pin" aria-hidden>📍</span>
+                <div className="dash-loc-chips">
+                  {locs.map((loc) => (<span key={loc} className="dash-loc-chip">{loc}</span>))}
+                </div>
+              </div>));
+            })()}
+
                 {(() => { const a = announcements[0];
                 const authorLabel = getAnnouncementAuthor(a);
                 return (
@@ -477,6 +502,9 @@ export default function Dashboard() {
                   <small className="text-gray-500 text-xs">
                     {formatTimestamp(announcements[0].createdAt || announcements[0].timestamp)}
                     </small>
+
+
+
               </div>
 
            {(() => {
