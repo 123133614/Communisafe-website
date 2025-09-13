@@ -4,6 +4,13 @@ import axios from "axios";
 
 const API_URL = process.env.REACT_APP_API_URL || "https://communisafe-backend.onrender.com";
 
+// thresholds
+const getLevelInfo = (level = 0) => {
+  if (level >= 20) return { color: "red", label: "High" };
+  if (level >= 10) return { color: "orange", label: "Medium" };
+  return { color: "blue", label: "Low" };
+};
+
 export default function FloodReadingsTable({ sensorId }) {
   const token = localStorage.getItem("token");
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -32,7 +39,8 @@ export default function FloodReadingsTable({ sensorId }) {
     }
   };
 
-  useEffect(() => { fetchRows(); /* auto-refresh every 30s */ 
+  useEffect(() => {
+    fetchRows();
     const id = setInterval(fetchRows, 30000);
     return () => clearInterval(id);
   }, [page, limit, from, to, sensorId]);
@@ -68,6 +76,22 @@ export default function FloodReadingsTable({ sensorId }) {
         </div>
       </div>
 
+      {/* Legend — color + label */}
+      <div className="flex items-center gap-6 mb-2">
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded-full" style={{ background: "blue" }}></span>
+          Low
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded-full" style={{ background: "orange" }}></span>
+          Medium
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded-full" style={{ background: "red" }}></span>
+          High
+        </span>
+      </div>
+
       <div className="overflow-auto rounded-xl border border-gray-200">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50 sticky top-0">
@@ -75,7 +99,7 @@ export default function FloodReadingsTable({ sensorId }) {
               <th className="px-3 py-2 text-left">Date/Time</th>
               <th className="px-3 py-2 text-left">Sensor</th>
               <th className="px-3 py-2 text-left">Address</th>
-              <th className="px-3 py-2 text-right">Water (cm)</th>
+              <th className="px-3 py-2 text-center">Water Level</th>
               <th className="px-3 py-2 text-right">Battery</th>
               <th className="px-3 py-2 text-left">Signal</th>
               <th className="px-3 py-2 text-left">Status</th>
@@ -86,17 +110,25 @@ export default function FloodReadingsTable({ sensorId }) {
               <tr><td className="px-3 py-4" colSpan={7}>Loading…</td></tr>
             ) : rows.length === 0 ? (
               <tr><td className="px-3 py-4" colSpan={7}>No records.</td></tr>
-            ) : rows.map((r, i) => (
-              <tr key={i} className="border-t">
-                <td className="px-3 py-2">{new Date(r.recordedAt).toLocaleString()}</td>
-                <td className="px-3 py-2">{r.sensor?.name}</td>
-                <td className="px-3 py-2">{r.sensor?.address}</td>
-                <td className="px-3 py-2 text-right">{r.waterLevel}</td>
-                <td className="px-3 py-2 text-right">{r.batteryLevel ?? "-"}</td>
-                <td className="px-3 py-2">{r.signalStrength ?? "-"}</td>
-                <td className="px-3 py-2">{r.status ?? "-"}</td>
-              </tr>
-            ))}
+            ) : rows.map((r, i) => {
+              const info = getLevelInfo(r.waterLevel ?? 0);
+              return (
+                <tr key={i} className="border-t">
+                  <td className="px-3 py-2">{new Date(r.recordedAt).toLocaleString()}</td>
+                  <td className="px-3 py-2">{r.sensor?.name}</td>
+                  <td className="px-3 py-2">{r.sensor?.address}</td>
+                  <td className="px-3 py-2 text-center">
+                    <span className="inline-flex items-center gap-1 justify-center">
+                      <span className="w-3 h-3 rounded-full" style={{ background: info.color }}></span>
+                      {info.label}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-right">{r.batteryLevel ?? "-"}</td>
+                  <td className="px-3 py-2">{r.signalStrength ?? "-"}</td>
+                  <td className="px-3 py-2">{r.status ?? "-"}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
