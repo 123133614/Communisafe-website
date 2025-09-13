@@ -14,7 +14,6 @@ const CATEGORY_OPTIONS = [
   "Maintenance",
   "Flood",
   "Events",
-  "Urgent",
   "Other",
 ];
 
@@ -163,7 +162,7 @@ export default function CommunityAnnouncements() {
   const [announcementImage, setAnnouncementImage] = useState(null);
   const [titleInput, setTitleInput] = useState("");
   const [activeAnnouncement, setActiveAnnouncement] = useState(null);
-  const [locationInput, setLocationInput] = useState("");
+ const [locationInput, setLocationInput] = useState([]);
   const [dateInput, setDateInput] = useState("");
   const [timeInput, setTimeInput] = useState("");
   const [contactInput, setContactInput] = useState("");
@@ -185,7 +184,20 @@ export default function CommunityAnnouncements() {
   const [editId, setEditId] = useState(null);
   const [editText, setEditText] = useState("");
   const authHeader = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
+  const [urgent, setUrgent] = useState(false); 
 
+
+
+  const addLocation = (loc) => {
+  if (!loc) return;
+  setLocationInput((prev) =>
+    prev.includes(loc) ? prev : [...prev, loc]
+  );
+};
+
+const removeLocation = (loc) => {
+  setLocationInput((prev) => prev.filter((x) => x !== loc));
+};
   // ─── Fetch announcements + sockets ───
   useEffect(() => {
     const fetchAnnouncements = async () => {
@@ -239,8 +251,9 @@ export default function CommunityAnnouncements() {
     return matchesCategory && matchesSearch;
   })
   .sort((a, b) => {
-    const aUrgent = (a.category || '').toLowerCase() === 'urgent';
-    const bUrgent = (b.category || '').toLowerCase() === 'urgent';
+    const aUrgent = !!a.urgent || (a.category || "").toLowerCase() === "urgent";
+    const bUrgent = !!b.urgent || (b.category || "").toLowerCase() === "urgent";
+
     if (aUrgent && !bUrgent) return -1;
     if (!aUrgent && bUrgent) return 1;
 
@@ -263,9 +276,18 @@ export default function CommunityAnnouncements() {
       formData.append("title", titleInput);
       formData.append("description", announcementText);
       formData.append("category", categoryInput || "Community Announcement");
-      formData.append("location", locationInput);
-      
+     
       formData.append("contact", contactInput);
+      formData.append("urgent", urgent ? "true" : "false");
+
+      if (Array.isArray(locationInput) && locationInput.length) {
+        formData.append("location", locationInput.join(", "));
+      } else if (locationInput) {formData.append("location", String(locationInput));
+
+      }
+
+
+
 
       if (dateInput) formData.append("date", dateInput);
       if (timeInput) formData.append("time", timeInput);
@@ -315,11 +337,12 @@ export default function CommunityAnnouncements() {
       setTitleInput("");
       setAnnouncementText("");
       setAnnouncementImage(null);
-      setLocationInput("");
+      setLocationInput([]);
       setDateInput("");
       setTimeInput("");
       setContactInput("");
       setCategoryInput("");
+      setUrgent(false);
     } catch (err) {
       console.error('POST ANN ERR:', err.response?.data || err.message);
 setError(err.response?.data?.error || err.response?.data?.message || err.message || "Failed to post announcement");
@@ -586,9 +609,8 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
               <motion.div
                 key={a._id}
                 className="flex bg-white border-2 rounded-lg shadow p-4 mb-5 items-start hover:shadow-lg cursor-pointer transition-transform transform hover:scale-[1.02]"
-                style={{
-                  borderColor: ((a.category || '').toLowerCase() === 'urgent') ? '#e53935' : '#388e3c',
-                }}
+               style={{ borderColor: (a.urgent || (a.category || "").toLowerCase() === "urgent")
+                  ? "#e53935" : "#388e3c",}}
                 onClick={() => openAnnouncement(a)}
               >
                 <div className="flex-shrink-0 w-40 h-28 overflow-hidden rounded-md border mr-4">
@@ -597,14 +619,13 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
 
                 <div className="flex flex-col flex-grow">
                   <div className="flex items-center mb-2">
-  <h2 className="text-lg font-bold text-gray-800 mr-2">{a.title}</h2>
-
-  {(a.category || '').toLowerCase() === 'urgent' && (
-    <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded">
-      URGENT
-    </span>
-  )}
-</div>
+                    <h2 className="text-lg font-bold text-gray-800 mr-2">{a.title}</h2>
+                    
+                    {(a.urgent || (a.category || "").toLowerCase() === "urgent") && (
+                      <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded inline-flex items-center gap-1">
+                        <span aria-hidden>❗</span> URGENT
+                        </span>)}
+                        </div>
 
 
                   <p className="text-sm text-gray-700 mb-3 line-clamp-4">
@@ -624,11 +645,12 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
 )}
 
 
-                        {a.location && (
-                          <span className="flex items-center text-pink-600">
-                            📍 {a.location}
-                            </span>
-                          )}
+                       {a.location && (
+  <span className="flex items-center text-pink-600">
+    📍 {Array.isArray(a.location) ? a.location.join(", ") : a.location}
+  </span>
+)}
+
                           </div>
                           </div>
               </motion.div>
@@ -700,7 +722,7 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
                       onClick={() => {
                         setTitleInput(activeAnnouncement.title);
                         setAnnouncementText(activeAnnouncement.description);
-                        setLocationInput(activeAnnouncement.location);
+                        
                         setDateInput(activeAnnouncement.date);
                         setTimeInput(activeAnnouncement.time);
                         setCategoryInput(activeAnnouncement.category);
@@ -708,6 +730,20 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
                         setEditingAnnouncement(activeAnnouncement);
                         setShowModal(true);
                         setActiveAnnouncement(null);
+
+                        setLocationInput(Array.isArray(activeAnnouncement.location)
+                         ? activeAnnouncement.location
+                         : activeAnnouncement.location
+                         ? String(activeAnnouncement.location)
+                         .split(",")
+                         .map(s => s.trim())
+                         .filter(Boolean)
+                         : []);
+
+                        setUrgent(
+                          Boolean(activeAnnouncement.urgent) ||
+                          ((activeAnnouncement.category || "").toLowerCase() === "urgent"));
+
                       }}
                       className="btn-edit"
                     >
@@ -843,124 +879,134 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
           </div>
         </div>
       )}
-
-      {/* Post/Edit Modal (unchanged) */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-xl p-8 w-full max-w-xl relative shadow-lg">
-            <button
-              className="absolute top-3 right-4 text-2xl text-gray-400 hover:text-black"
-              onClick={() => {
-                setShowModal(false);
-                setEditingAnnouncement(null);
-              }}
-              disabled={isLoading}
-            >
-              &times;
-            </button>
-            <div className="flex items-center gap-3 mb-4">
-              <img src={multiico} alt="icon" className="w-10 h-10" />
-              <h2 className="text-2xl font-bold text-green-700">
-                {editingAnnouncement ? "Update Announcement" : "Post Announcement"}
-              </h2>
-            </div>
-            <input
-              type="text"
-              placeholder="Enter Title..."
-              className="w-full border p-3 rounded-md mb-3 text-lg font-semibold"
-              value={titleInput}
-              onChange={(e) => setTitleInput(e.target.value)}
-            />
-            <select
-              value={categoryInput}
-              onChange={(e) => setCategoryInput(e.target.value)}
-              className="w-full border p-3 rounded-md mb-3 text-base"
-              required
-            >
-              <option value="">Select Category</option>
-              {CATEGORY_OPTIONS.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-            <textarea
-              rows={5}
-              placeholder="Write Announcement..."
-              className="w-full border p-3 rounded-md mb-3 text-base"
-              value={announcementText}
-              onChange={(e) => setAnnouncementText(e.target.value)}
-            />
-            <select
-              value={locationInput}
-              onChange={(e) => setLocationInput(e.target.value)}
-              className="w-full border p-3 rounded-md mb-3 text-base"
-              required
-            >
-              <option value="">Select Location</option>
-              {MULTINATIONAL_STREETS.map((street) => (
-                <option key={street} value={street}>
-                  {street}
-                </option>
-              ))}
-            </select>
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div className="modal-form-container relative">
+      <button
+        className="modal-close-btn"
+        onClick={() => {
+          setShowModal(false);
+          setEditingAnnouncement(null);
+        }}
+        disabled={isLoading}
+      >
+        &times;
+      </button>
 
-            <div className="flex gap-3 mb-3">
-              <input
-                type="date"
-                className="border p-3 rounded-md flex-1"
-                value={dateInput}
-                min={new Date().toISOString().split("T")[0]}
-                onChange={(e) => setDateInput(e.target.value)}
-              />
-              <input
-                type="time"
-                className="border p-3 rounded-md flex-1"
-                value={timeInput}
-                onChange={(e) => setTimeInput(e.target.value)}
-              />
-            </div>
+      
+<div className="modal-form-image">
+  {announcementImage ? (
+    <img
+      src={URL.createObjectURL(announcementImage)}
+      alt="Preview"
+      className="modal-img"   // ← palitan ito (wag na yung w-full h-full object-cover)
+    />
+  ) : (
+    <label className="upload-dropzone">
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => setAnnouncementImage(e.target.files[0])}
+      />
+      <span>+ Add Image</span>
+    </label>
+  )}
+</div>
 
-            <label className="flex items-center gap-2 mb-3 cursor-pointer text-base">
-              <input
-                type="checkbox"
-                checked={categoryInput === "Urgent"}
-                onChange={(e) => setCategoryInput(e.target.checked ? "Urgent" : "")}
-              />
-              Mark as Urgent
-            </label>
 
-            <label className="flex items-center gap-2 mb-3 cursor-pointer text-base text-blue-600">
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => setAnnouncementImage(e.target.files[0])}
-              />
-              <span className="bg-blue-100 px-3 py-1 rounded">Add Image</span>
-            </label>
+      {/* Right = Form fields */}
+      <div className="modal-form-fields">
+        <h2 className="text-2xl font-bold text-green-700 mb-3">
+          {editingAnnouncement ? "Update Announcement" : "Post Announcement"}
+        </h2>
 
-            {announcementImage && (
-              <img
-                src={URL.createObjectURL(announcementImage)}
-                alt="Preview"
-                className="w-full h-56 object-cover rounded-md mb-3"
-              />
-            )}
+        <input
+          type="text"
+          placeholder="Enter Title..."
+          className="input-field"
+          value={titleInput}
+          onChange={(e) => setTitleInput(e.target.value)}
+        />
 
-            <div className="flex justify-between items-center mt-6">
-              <button
-                onClick={handlePostAnnouncement}
-                className="bg-green-600 text-white px-6 py-3 rounded-md text-lg font-bold hover:bg-green-700 w-full"
-                disabled={isLoading}
-              >
-                {isLoading
-                  ? "Posting..."
-                  : editingAnnouncement
-                  ? "UPDATE"
-                  : "POST ANNOUNCEMENT"}
-              </button>
-            </div>
+        <select
+          value={categoryInput}
+          onChange={(e) => setCategoryInput(e.target.value)}
+          className="input-field"
+        >
+          <option value="">Select Category</option>
+          {CATEGORY_OPTIONS.map((cat) => (
+            <option key={cat} value={cat}>
+              {cat}
+            </option>
+          ))}
+        </select>
+
+        <textarea
+          rows={4}
+          placeholder="Write Announcement..."
+          className="input-field"
+          value={announcementText}
+          onChange={(e) => setAnnouncementText(e.target.value)}
+        />
+
+        <select
+          value=""
+          onChange={(e) => addLocation(e.target.value)}
+          className="input-field"
+        >
+          <option value="">Add Location…</option>
+          {MULTINATIONAL_STREETS.filter((s) => !locationInput.includes(s)).map(
+            (street) => (
+              <option key={street} value={street}>
+                {street}
+              </option>
+            )
+          )}
+        </select>
+
+        {locationInput.length > 0 && (
+          <div className="mb-2 text-sm">
+            <strong>Selected:</strong> {locationInput.join(", ")}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <input
+            type="date"
+            className="input-field flex-1"
+            value={dateInput}
+            onChange={(e) => setDateInput(e.target.value)}
+          />
+          <input
+            type="time"
+            className="input-field flex-1"
+            value={timeInput}
+            onChange={(e) => setTimeInput(e.target.value)}
+          />
+        </div>
+
+        <label className="flex items-center gap-2 mb-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={urgent}
+            onChange={(e) => setUrgent(e.target.checked)}
+          />
+          <span>{urgent ? "❗ Urgent" : "Mark as Urgent"}</span>
+        </label>
+
+        <button
+          onClick={handlePostAnnouncement}
+          className="btn-submit"
+          disabled={isLoading}
+        >
+          {isLoading
+            ? "Posting..."
+            : editingAnnouncement
+            ? "Update"
+            : "Post Announcement"}
+        </button>
+      </div>
 
             {isLoading && (
               <div className="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center rounded-xl">
