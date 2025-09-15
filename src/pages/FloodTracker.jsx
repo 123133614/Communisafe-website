@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { io } from "socket.io-client";
 import useDesktopNotification from "../hooks/useDesktopNotification";
-// src/components/FloodTracker.jsx
+
 import FloodReadingsTable from "./FloodReadingsTable"; 
 import FloodReportsTable from "./FloodReportsTable";
 import FloodAnalysisGraph from "../components/FloodAnalysisGraph";
@@ -574,7 +574,7 @@ const chartOptions = {
       </div>
     </section>
 
-    {/* Real-Time Data Chart */}
+    
     <section className="appr-card" style={{ padding: 16, marginTop: 16 }}>
       <h3 className="font-semibold text-gray-700 mb-2">Real-Time Water Level</h3>
       <div
