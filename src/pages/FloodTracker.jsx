@@ -4,12 +4,12 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { io } from "socket.io-client";
 import useDesktopNotification from "../hooks/useDesktopNotification";
 // src/components/FloodTracker.jsx
-import FloodReadingsTable from "./FloodReadingsTable"; // ⬅️ ADD THIS
+import FloodReadingsTable from "./FloodReadingsTable"; 
 import FloodReportsTable from "./FloodReportsTable";
-
+import FloodAnalysisGraph from "../components/FloodAnalysisGraph";
 import axios from "axios";
 
-// Leaflet imports
+
 import {
   MapContainer,
   TileLayer,
@@ -133,7 +133,7 @@ export default function FloodTracker() {
   const notify = useDesktopNotification();
   const navigate = useNavigate();
   const location = useLocation();
-  const [view, setView] = useState("live"); 
+  const [view, setView] = useState("live");
 
   // ─── Sidebar links (same order/icons as Visitor) ─────────────────────────
   const sidebarLinks = [
@@ -225,20 +225,20 @@ export default function FloodTracker() {
   const [floodSensors, setFloodSensors] = useState([]);
   const [waterLevels, setWaterLevels] = useState([]);
   const [timestamps, setTimestamps] = useState([]);
-  
 
+const pushPoint = (value, ts = Date.now()) => {
+  const t = typeof ts === "string" ? Date.parse(ts) : (Number(ts) || Date.now());
+  const rounded = Math.floor(t / 1000);
+  if (rounded === lastTsRef.current) return; 
 
-
- const pushPoint = (value, ts = Date.now()) => {
-  const t = typeof ts === "string" ? Date.parse(ts) : ts;
-  const rounded = Math.floor(t / 1000); // round to the second
-  if (rounded === lastTsRef.current) return; // avoid adding duplicate data
   lastTsRef.current = rounded;
+
 
   setSeries((prev) => {
     const next = [...prev, Number(value || 0)];
     return next.length > MAX_POINTS ? next.slice(next.length - MAX_POINTS) : next;
   });
+
   setLabels((prev) => {
     const next = [
       ...prev,
@@ -246,90 +246,92 @@ export default function FloodTracker() {
     ];
     return next.length > MAX_POINTS ? next.slice(next.length - MAX_POINTS) : next;
   });
+
+  console.log("Pushed new data point:", value); 
 };
 
-useEffect(() => {
-  if (!sensor?._id) return;
-  let stop = false;
-  setSeries([]); // Clear old data before loading new ones
-  setLabels([]);
-  lastTsRef.current = 0;
 
-  const load = async () => {
+useEffect(() => {
+  (async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/flood/readings`, {
-        params: { sensorId: sensor._id, page: 1, limit: 60 },
-        headers: getAuthHeaders(),
-      });
-      if (stop) return;
-      const items = (res.data.items || []).slice().reverse(); // oldest → newest
-      setSeries(items.map((r) => Number(r.waterLevel || 0)));
-      setLabels(
-        items.map((r) =>
-          new Date(r.recordedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
-        )
+      // 1) get any sensor (first one)
+      const sRes = await axios.get(`${API_URL}/api/flood/sensors`, { headers: getAuthHeaders() });
+      const first = Array.isArray(sRes.data) && sRes.data.length ? sRes.data[0] : null;
+      if (!first) return; // no sensor configured yet
+      setSensor(first);
+
+      // 2) preload last 60 readings so the chart shows immediately
+      const rRes = await axios.get(
+        `${API_URL}/api/flood/readings?sensorId=${first._id}&limit=60`,
+        { headers: getAuthHeaders() }
       );
-      // Update deduplication reference to the last record timestamp
+      const items = (rRes.data?.items || []).slice().reverse(); // oldest → newest
+
+      setSeries(items.map(r => Number(r.waterLevel || 0)));
+      setLabels(items.map(r =>
+        new Date(r.recordedAt || r.createdAt || Date.now())
+          .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      ));
+
       if (items.length) {
-        lastTsRef.current = Math.floor(new Date(items[items.length - 1].recordedAt).getTime() / 1000);
+        const last = items[items.length - 1];
+        const t = new Date(last.recordedAt || Date.now()).getTime();
+        lastTsRef.current = Math.floor(t / 1000);
       }
     } catch (e) {
-      console.error("readings load error:", e?.response?.status || e.message);
+      console.error('Init sensor/history failed:', e);
     }
-  };
+  })();
+}, []); // run once
 
-  load();
-  const id = setInterval(load, 5000);
-  return () => {
-    stop = true;
-    clearInterval(id);
-  };
-}, [sensor?._id, API_URL]);
+
+
+
 
 useEffect(() => {
-  if (!sensor?._id) return;
-  // Close any previous socket
+  if (!sensor?._id) return; 
   if (socketRef.current) {
     try {
       socketRef.current.close();
     } catch {}
   }
 
-  const socket = io(API_URL, {
-    path: "/socket.io/",
-    transports: ["websocket"],
-    withCredentials: true,
-  });
+ const socket = io(API_URL, {
+  path: "/socket.io/",
+  transports: ["websocket", "polling"], 
+  withCredentials: true,
+});
+
+
   socketRef.current = socket;
 
   socket.on("connect", () => {
-    // console.log("WS connected", socket.id);
+    console.log("WebSocket connected");  
   });
 
-  socket.on("sensor_data_updated", (payload) => {
-    try {
-      if (!payload?._id) return;
-      if (String(payload._id) !== String(sensor._id)) return; // only track the active sensor
-      // Update the sensor state
-      setSensor((prev) => ({ ...(prev || {}), ...payload }));
-      // Push the new point to the chart instantly
-      pushPoint(payload.waterLevel, payload.lastUpdated || Date.now());
-    } catch (e) {
-      console.warn("sensor_data_updated parse error:", e);
-    }
-  });
+socket.on("sensor_data_updated", (payload) => {
+  console.log("Sensor Data Updated: ", payload);  
+  setSensor((prev) => ({ ...(prev || {}), ...payload }));
+  pushPoint(Number(payload.waterLevel ?? 0), payload.lastUpdated || Date.now());  
+});
+
+socket.on("flood_reading_created", (payload) => {
+  pushPoint(Number(payload.waterLevel ?? 0), payload.recordedAt || payload.createdAt || Date.now());
+});
+
 
   socket.on("disconnect", () => {
-    // console.log("WS disconnected");
+    console.log("WebSocket disconnected");
   });
 
+  
   return () => {
     try {
       socket.close();
     } catch {}
     socketRef.current = null;
   };
-}, [sensor?._id, API_URL]);
+}, [sensor?._id]);
 
 
   // Submit flood report
@@ -370,18 +372,19 @@ if (waterLevelFt >= 2.9) floodLevel = "HIGH";
 else if (waterLevelFt >= 2.0) floodLevel = "MEDIUM";
 else if (waterLevelFt >= 1.0) floodLevel = "LOW";
 
-  // thresholds in cm (i-adjust mo kung gusto mo)
-const THRESH = { low: 30, medium: 60, high: 90 };
 
-const levelColor = (y) => {
-  if (y >= THRESH.high) return "red";
-  if (y >= THRESH.medium) return "orange";
-  if (y >= THRESH.low) return "blue"; // Low = blue (ayon sa legend mo)
-  return "green"; // normal
+
+const THRESH = { low: 30, medium: 60, high: 90 };
+const levelColor = (value) => {
+  if (value >= THRESH.high) return "red";    
+  if (value >= THRESH.medium) return "orange";  
+  if (value >= THRESH.low) return "blue";   
+  return "green";  
 };
 
+
 const chartData = {
-  labels,          // galing sa readings history
+  labels,
   datasets: [
     {
       label: "Water Level (cm)",
@@ -390,13 +393,8 @@ const chartData = {
       tension: 0.3,
       pointRadius: 0,
       fill: false,
-      // 👉 ito ang nagpapailaw per segment habang tumataas
-      segment: {
-        borderColor: (ctx) => {
-          const y = ctx.p1?.parsed?.y ?? 0; // color by next point's height
-          return levelColor(y);
-        },
-      },
+      // keep it simple; no scriptable here (those can silently break rendering)
+      borderColor: "#22c55e",
     },
   ],
 };
@@ -417,7 +415,7 @@ const chartOptions = {
 
   return (
     <div className="appr-container">
-      {/* Sidebar — same look as Visitor Management */}
+    
       <aside
         className="appr-sidebar"
         style={{ backgroundImage: `url(${process.env.PUBLIC_URL}/assets/sidebar.png)` }}
@@ -458,6 +456,7 @@ const chartOptions = {
     >
       Records
     </button>
+     <button className="btn-cancel" onClick={() => setView("analysis")} disabled={view === "analysis"}>Analysis</button>
 
 
      <button
@@ -470,242 +469,194 @@ const chartOptions = {
 
 
   {view === "live" ? (
-    <>
-      {/* Map Card */}
-      <section className="appr-card" style={{ padding: 16 }}>
-        <h2 className="text-lg font-bold text-gray-700 mb-2">Flood Map</h2>
-        <div
-          className="rounded-2xl overflow-hidden border border-green-100 bg-white"
-          style={{ height: 340 }}
+  <>
+    {/* Map Card */}
+    <section className="appr-card" style={{ padding: 16 }}>
+      <h2 className="text-lg font-bold text-gray-700 mb-2">Flood Map</h2>
+      <div
+        className="rounded-2xl overflow-hidden border border-green-100 bg-white"
+        style={{ height: 340 }}
+      >
+        <MapContainer
+          center={[14.4875, 121.0075]}
+          zoom={17}
+          style={{ height: "100%", width: "100%" }}
         >
-          <MapContainer
-            center={[14.4875, 121.0075]}
-            zoom={17}
-            style={{ height: "100%", width: "100%" }}
-          >
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution="&copy; OpenStreetMap contributors"
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution="&copy; OpenStreetMap contributors"
+          />
+          {canReport && (
+            <LocationMarker
+              setNewAlert={setNewAlert}
+              setShowModal={setShowModal}
+              sensor={sensor}
             />
-            {canReport && (
-              <LocationMarker
-                setNewAlert={setNewAlert}
-                setShowModal={setShowModal}
-                sensor={sensor}
-              />
-            )}
+          )}
 
-            {alerts.map((alert, i) => {
-              const iconColor = getSeverityColor(alert.severity);
-              const customIcon = new L.Icon({
-                iconUrl: `https://maps.google.com/mapfiles/ms/icons/${iconColor}-dot.png`,
-                iconSize: [25, 41],
-                iconAnchor: [12, 41],
-                popupAnchor: [1, -34],
-                shadowUrl: markerShadow,
-                shadowSize: [41, 41],
-              });
+          {alerts.map((alert, i) => {
+            const iconColor = getSeverityColor(alert.severity);
+            const customIcon = new L.Icon({
+              iconUrl: `https://maps.google.com/mapfiles/ms/icons/${iconColor}-dot.png`,
+              iconSize: [25, 41],
+              iconAnchor: [12, 41],
+              popupAnchor: [1, -34],
+              shadowUrl: markerShadow,
+              shadowSize: [41, 41],
+            });
 
-               const lat = Number(alert?.coordinates?.lat);
-                const lng = Number(alert?.coordinates?.lng);
-                if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-              return (
-                <Marker
-                  key={i}
-                  position={[lat, lng]}
-                  icon={customIcon}
-                >
-                  <Popup>
-                    <strong>{alert.location}</strong>
-                    <br />
-                    {alert.description}
-                    <br />
-                    <span
-                      style={{
-                        color: getSeverityColor(alert.severity),
-                        fontWeight: "bold",
-                      }}
-                    >
-                      Severity: {alert.severity}
-                    </span>
-                    <br />
-                      {formatTimestamp(alert.createdAt)}
-                  </Popup>
-                </Marker>
-              );
-            })}
-
-            <Polyline
-              positions={geojsonLineString}
-              pathOptions={{ color: "blue", weight: 4, dashArray: "6 8" }}
-            />
-            {sensor && (
-              <Marker position={geojsonPoints[0]}>
+            const lat = Number(alert?.coordinates?.lat);
+            const lng = Number(alert?.coordinates?.lng);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+            return (
+              <Marker
+                key={i}
+                position={[lat, lng]}
+                icon={customIcon}
+              >
                 <Popup>
-                  <strong>{sensor.name}</strong>
+                  <strong>{alert.location}</strong>
                   <br />
-                  {sensor.address}
+                  {alert.description}
                   <br />
-                  Water Level: {sensor.waterLevel} cm / {waterLevelFt.toFixed(2)} ft
+                  <span
+                    style={{
+                      color: getSeverityColor(alert.severity),
+                      fontWeight: "bold",
+                    }}
+                  >
+                    Severity: {alert.severity}
+                  </span>
                   <br />
-                  Flood Level: {floodLevel}
+                  {formatTimestamp(alert.createdAt)}
                 </Popup>
               </Marker>
-            )}
-            {geojsonPoints.slice(1).map((pos, idx) => (
-              <Marker key={idx + 1} position={pos} />
-            ))}
-          </MapContainer>
-        </div>
+            );
+          })}
 
-        {/* Legend */}
-        <div className="flex gap-4 mt-2 text-sm">
-          <div className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded-full bg-green-600" /> Sensor
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded-full bg-blue-600" /> Low
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded-full bg-orange-400" /> Medium
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded-full bg-red-600" /> High
-          </div>
-        </div>
-      </section>
-
-      {/* Chart Card */}
-      <section className="appr-card" style={{ padding: 16, marginTop: 16 }}>
-        <h3 className="text-lg font-semibold text-green-700 mb-2">
-          📈 Real-Time Water Level Chart
-        </h3>
-        <div style={{ height: 300 }}>
-          <Line data={chartData} options={chartOptions} />
-        </div>
-      </section>
-
-      {/* Sensor Data Card */}
-      <section className="appr-card" style={{ padding: 16, marginTop: 16 }}>
-        <h3 className="font-semibold text-gray-700 mb-2">Sensor Real-Time Data</h3>
-        <div
-          className="sensor-card"
-          style={{ boxShadow: "none", border: "none", padding: 0 }}
-        >
-          {sensor ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <span>
-                <strong>Location:</strong> {sensor.address}
-              </span>
-              <span>
-                <strong>Water Level:</strong> {sensor.waterLevel} cm /{" "}
-                {waterLevelFt.toFixed(2)} ft
-              </span>
-              <span>
-                <strong>Battery:</strong> {sensor.batteryLevel}%
-              </span>
-              <span>
-                <strong>Signal:</strong> {sensor.signalStrength}
-              </span>
-              <span>
-                <strong>Status:</strong> {sensor.status}
-              </span>
-              <span>
-                <strong>Last Updated:</strong>{" "}
-                {sensor.lastUpdated ? formatTimestamp(sensor.lastUpdated) : "N/A"}
-              </span>
-              <span>
-                <strong>Flood Level:</strong>{" "}
-                <span
-                  style={{
-                    color:
-                      floodLevel === "HIGH"
-                        ? "red"
-                        : floodLevel === "MEDIUM"
-                        ? "orange"
-                        : floodLevel === "LOW"
-                        ? "blue"
-                        : "gray",
-                    fontWeight: "bold",
-                  }}
-                >
-                  {floodLevel}
-                </span>
-              </span>
-            </div>
-          ) : (
-            <span className="text-gray-500">No sensor data available.</span>
+          <Polyline
+            positions={geojsonLineString}
+            pathOptions={{ color: "blue", weight: 4, dashArray: "6 8" }}
+          />
+          {sensor && (
+            <Marker position={geojsonPoints[0]}>
+              <Popup>
+                <strong>{sensor.name}</strong>
+                <br />
+                {sensor.address}
+                <br />
+                Water Level: {sensor.waterLevel} cm / {waterLevelFt.toFixed(2)} ft
+                <br />
+                Flood Level: {floodLevel}
+              </Popup>
+            </Marker>
           )}
+          {geojsonPoints.slice(1).map((pos, idx) => (
+            <Marker key={idx + 1} position={pos} />
+          ))}
+        </MapContainer>
+      </div>
+
+      {/* Legend */}
+      <div className="flex gap-4 mt-2 text-sm">
+        <div className="flex items-center gap-1">
+          <span className="inline-block w-3 h-3 rounded-full bg-green-600" /> Sensor
         </div>
-      </section>
-    </>
- ) : view === "records" ? (
+        <div className="flex items-center gap-1">
+          <span className="inline-block w-3 h-3 rounded-full bg-blue-600" /> Low
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="inline-block w-3 h-3 rounded-full bg-orange-400" /> Medium
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="inline-block w-3 h-3 rounded-full bg-red-600" /> High
+        </div>
+      </div>
+    </section>
+
+    {/* Real-Time Data Chart */}
+    <section className="appr-card" style={{ padding: 16, marginTop: 16 }}>
+      <h3 className="font-semibold text-gray-700 mb-2">Real-Time Water Level</h3>
+      <div
+        className="rounded-2xl overflow-hidden border border-green-100 bg-white"
+        style={{ height: 300 }}
+      >
+        {/* Real-time Chart */}
+       {!sensor ? (
+  <div className="p-4 text-gray-500">No sensor configured yet.</div>
+) : (
+  <Line key={labels.length} data={chartData} options={chartOptions} />
+)}
+
+      </div>
+    </section>
+
+    {/* Sensor Data Card */}
+    <section className="appr-card" style={{ padding: 16, marginTop: 16 }}>
+      <h3 className="font-semibold text-gray-700 mb-2">Sensor Real-Time Data</h3>
+      <div
+        className="sensor-card"
+        style={{ boxShadow: "none", border: "none", padding: 0 }}
+      >
+        {sensor ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <span>
+              <strong>Location:</strong> {sensor.address}
+            </span>
+            <span>
+              <strong>Water Level:</strong> {sensor.waterLevel} cm /{" "}
+              {waterLevelFt.toFixed(2)} ft
+            </span>
+            <span>
+              <strong>Battery:</strong> {sensor.batteryLevel}%
+            </span>
+            <span>
+              <strong>Signal:</strong> {sensor.signalStrength}
+            </span>
+            <span>
+              <strong>Status:</strong> {sensor.status}
+            </span>
+            <span>
+              <strong>Last Updated:</strong>{" "}
+              {sensor.lastUpdated ? formatTimestamp(sensor.lastUpdated) : "N/A"}
+            </span>
+            <span>
+              <strong>Flood Level:</strong>{" "}
+              <span
+                style={{
+                  color:
+                    floodLevel === "HIGH"
+                      ? "red"
+                      : floodLevel === "MEDIUM"
+                      ? "orange"
+                      : floodLevel === "LOW"
+                      ? "blue"
+                      : "gray",
+                  fontWeight: "bold",
+                }}
+              >
+                {floodLevel}
+              </span>
+            </span>
+          </div>
+        ) : (
+          <span className="text-gray-500">No sensor data available.</span>
+        )}
+      </div>
+    </section>
+  </>
+) : view === "records" ? (
   <FloodReadingsTable sensorId={sensor?._id} />
-   ) : (
-    <FloodReportsTable />
-    )}
+
+)  : view === "analysis" ? (
+  <FloodAnalysisGraph sensorId={sensor?._id} />
+): (
+  <FloodReportsTable />
+)}
+
 </main>
 
 
-      {/* Report Modal */}
-      {showModal && (role === "security" || role === "official") && (
-        <div className="modal-backdrop">
-          <div className="modal-content flood-modal">
-            <h2 className="modal-header text-green-700">Report Flood</h2>
-            <form onSubmit={handleReportSubmit} className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium mb-1">Location</label>
-                <input type="text" value={newAlert.location} readOnly className="input-disabled" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Severity</label>
-                <div className="input-disabled font-bold text-center" style={{ color: getSeverityColor(newAlert.severity) }}>
-                  {newAlert.severity || "N/A"}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
-                <textarea
-                  placeholder="Describe the flood situation"
-                  value={newAlert.description}
-                  onChange={(e) => setNewAlert({ ...newAlert, description: e.target.value })}
-                  required
-                  className="textarea-input"
-                />
-              </div>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-1">Latitude</label>
-                  <input type="text" value={newAlert.lat} disabled className="input-disabled" />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-1">Longitude</label>
-                  <input type="text" value={newAlert.lng} disabled className="input-disabled" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Date & Time</label>
-                <input type="datetime-local" value={newAlert.timestamp.slice(0, 16)} disabled className="input-disabled" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Contact Number</label>
-                <input
-                  type="text"
-                  placeholder="Your contact number"
-                  value={newAlert.contact}
-                  onChange={(e) => setNewAlert({ ...newAlert, contact: e.target.value })}
-                  required
-                  className="text-input"
-                />
-              </div>
-              <div className="flex justify-end gap-3 mt-4">
-                <button type="button" onClick={() => setShowModal(false)} className="btn-cancel">Cancel</button>
-                <button type="submit" className="btn-submit">Submit</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
