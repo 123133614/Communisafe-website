@@ -2,7 +2,7 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
 
-/* ─── Overall Container ─────────────────────────────────────────────────── */
+
 .dashboard-container {
   display: flex;
   flex-direction: column;
@@ -11,7 +11,7 @@
   font-family: 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-/* ─── Top Bar ───────────────────────────────────────────────────────────── */
+
 .topbar-container {
   display: flex;
   justify-content: space-between;
@@ -45,8 +45,7 @@
   box-shadow: 0 0 0 2px rgba(22,163,74,0.2);
 }
 
-/* ─── Sidebar ───────────────────────────────────────────────────────────── */
-/* === Sidebar like Flood Tracker (appr-*) =============================== */
+
 .appr-container{
   display:grid;
   grid-template-columns:280px 1fr;
@@ -70,7 +69,7 @@
   display:flex;
   flex-direction:column;
   gap:6px;
-  margin-top:220px; /* keep same spacing as your screenshot */
+  margin-top:220px; 
 }
 
 .appr-sidebar-link{
@@ -92,12 +91,12 @@
 .appr-sidebar-icon{ width:20px; height:20px; flex-shrink:0; margin-top:2px; }
 .appr-sidebar-link span{ flex:1; word-wrap:break-word; white-space:normal; }
 
-/* main area container for pages using appr- layout */
+
 .appr-main{
   padding:24px 32px 40px;
 }
 
-/* responsive collapse to icon-only */
+
 @media (max-width:980px){
   .appr-container{ grid-template-columns:80px 1fr; }
   .appr-sidebar-link span{ display:none; }
@@ -107,12 +106,11 @@
   .appr-main{ padding:16px; }
 }
 
-/* === END appr-* styles ================================================= */
+
 
 .active-link { background: #e6ffed; color: #16a34a; }
 .active-link .sidebar-icon { color: #16a34a; }
 
-/* ─── Main Content ──────────────────────────────────────────────────────── */
 .dashboard-main {
   flex: 1;
   padding: 2rem 2rem 2rem 2.5rem;
@@ -132,7 +130,7 @@
   border-radius: 0.375rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   transition: background 0.2s;
-  margin-top: 1.25rem; /* ← Add this */
+  margin-top: 1.25rem; 
 }
 .btn-post:hover { background:#15803d; }
 .announcements-list {
@@ -166,7 +164,7 @@
   margin-top:auto; display:flex; align-items:center; gap:0.625rem;
 }
 
-/* ─── Details Modal ───────────────────────────────────────────────────── */
+
 .modal-details-container {
   background:#fff; padding:1.5rem; border-radius:0.5rem;
   max-width:600px; width:90%;
@@ -183,10 +181,10 @@
   max-width:100%; border-radius:0.375rem; margin-bottom:1rem;
 }
 .modal-timestamp { font-size:0.875rem; color:#6b7280; }
-/* ensure details is under the create form */
+
 .fixed.inset-0 { z-index:50; }
 
-/* ─── Create Form Overlay ─────────────────────────────────────────────── */
+
 .modal-overlay {
   position:fixed; inset:0; background:rgba(0,0,0,0.5);
   display:flex; align-items:center; justify-content:center;
@@ -197,40 +195,35 @@
   max-width:600px; width:90%; z-index:61;
 }
 
-/* ─── Global Loading Overlay ─────────────────────────────────────────── */
-/* ─── Modal Details Landscape ─────────────────────────────────────────── */
-/* Modal Details */
-/* ─── Main Modal Design ───────────────────────────────────────────────── */
-/* ─── Modal Details ─────────────────────────────────────────────────── */
 .modal-details-container {
   background: #fff;
   padding: 1rem;
   border-radius: 12px;
-  max-width: 700px; /* Reduced size */
+  max-width: 700px; 
   width: 90%;
-  max-height: 80vh; /* Limit modal height */
-  overflow-y: auto; /* Enable scrolling for content */
+  max-height: 80vh;
+  overflow-y: auto; 
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
 }
 
-/* Title */
+
 .modal-title {
-  font-size: 1.25rem; /* Slightly smaller title */
+  font-size: 1.25rem; 
   font-weight: bold;
   color: #047857;
   margin-bottom: 0.5rem;
 }
 
-/* Description */
+
 .modal-description {
   font-size: 1rem;
   margin-bottom: 1rem;
   color: #333;
 }
 
-/* Image Styling */
+
 .modal-image-side img {
   width: 100%;
   height: auto;
@@ -242,19 +235,18 @@
   margin-bottom: 1rem;
 }
 
-/* ─── Comments Section ───────────────────────────────────────────────── */
 .comments-section {
-  max-height: 300px; /* Scrollable area for comments */
-  overflow-y: auto; /* Scrollable content */
+  max-height: 300px;
+  overflow-y: auto; 
   padding-right: 1rem;
 }
 
 .comments-list {
   max-height: 200px;
-  overflow-y: auto; /* Make the list scrollable */
+  overflow-y: auto;
 }
 
-/* Textarea Styling */
+
 textarea {
   width: 100%;
   padding: 0.75rem;
@@ -281,7 +273,7 @@ button:disabled {
 }
 
 
-/* Responsive Image */
+
 .modal-image-side img {
   width: 100%;
   height: 100%;
@@ -291,7 +283,7 @@ button:disabled {
   padding: 10px;
 }
 
-/* Title and Description Adjustments */
+
 .modal-title {
   font-size: 1.5rem;
   font-weight: bold;
@@ -307,7 +299,7 @@ button:disabled {
   overflow-y: auto;
 }
 
-/* Adjust button styling for responsiveness */
+
 .modal-actions button {
   min-width: 80px;
   padding: 8px 16px;
@@ -329,7 +321,6 @@ button:disabled {
   color: #000;
 }
 
-/* Adjust other inputs (Title, Category, Date etc.) */
 input,
 select,
 textarea {
@@ -341,7 +332,7 @@ textarea {
   box-sizing: border-box;
 }
 
-/* For smaller screens */
+
 @media (max-width: 640px) {
   .modal-details-container {
     flex-direction: column;
@@ -362,22 +353,21 @@ textarea {
 .topbar-title, .dashboard-main h2, .dashboard-main h3, .dashboard-main h1 {
   font-family: 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
-/* === Make topbar flush with the sidebar & top =================== */
+
 .appr-main{
-  /* remove top & left padding so the topbar hugs the edges */
+
   padding: 0;
 }
 
-/* keep the topbar full‑width, no radius, no extra spacing */
+
 .appr-main > .topbar-container{
   margin: 0;
   border-radius: 0;
-  position: sticky;   /* optional: stays visible on scroll */
+  position: sticky;   
   top: 0;
   z-index: 20;
 }
 
-/* put the original page padding BACK for the content below topbar */
 .appr-content{
   padding: 24px 32px 40px;
 }
@@ -386,7 +376,7 @@ textarea {
 @media (max-width:640px){
   .appr-content{ padding:16px; }
 }
-/* Modal form landscape */
+
 .modal-form-container {
   background: #fff;
   display: flex;
@@ -461,7 +451,6 @@ textarea {
   cursor: pointer;
 }
 
-/* Responsive: stack vertically sa mobile */
 @media (max-width: 768px) {
   .modal-form-container {
     flex-direction: column;
@@ -472,7 +461,7 @@ textarea {
 }
 
 .modal-form-image{
-  flex: 0 0 320px;       
+  flex: 0 0 320px;        
   max-width: 360px;
   display: flex;
   align-items: center;
@@ -480,14 +469,14 @@ textarea {
   background: #f3f4f6;
   border-radius: 12px;
   padding: 8px;
-
+ 
 }
 
 
 .modal-img{
   width: 100%;
   height: 100%;
-  max-height: 380px;      
+  max-height: 380px;     
   object-fit: contain;    
   border-radius: 10px;
 }
@@ -509,3 +498,14 @@ textarea {
   }
   .modal-img{ max-height: 240px; }
 }
+
+.modal-form-fields label {
+  display: flex;
+  align-items: center;  
+  gap: 6px;              
+}
+
+.modal-form-fields label input[type="checkbox"] {
+  margin: 0;           
+}
+
