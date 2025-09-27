@@ -517,7 +517,7 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
 
   return (
     <div className="appr-container">
-      {/* SIDEBAR — same look as your Flood Tracker */}
+    
       <aside
         className="appr-sidebar"
         style={{
@@ -540,9 +540,9 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
         </nav>
       </aside>
 
-      {/* MAIN — your TOPBAR stays exactly the same, just moved here */}
+    
       <main className="appr-main">
-        {/* Topbar (unchanged) */}
+
         <div className="topbar-container">
           <h1 className="topbar-title">Community Announcements</h1>
 
@@ -570,7 +570,7 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
           </div>
         </div>
 
-        {/* Main content (your existing markup) */}
+       
         {error && <div className="error-banner">{error}</div>}
 
         <p className="greeting-text">
@@ -637,7 +637,7 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
                       {a.createdAt ? new Date(a.createdAt).toLocaleString() : '—'}
                       </span>
                       
-                      {/* Author */}
+                
                       {!!a.author && (
   <span className="text-gray-600 mr-4">
     <strong>{formatAuthor(a.author)}</strong>
@@ -658,7 +658,7 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
         </div>
       </main>
 
-      {/* View Details Modal — ENHANCED (reactions + comments) */}
+ 
       {activeAnnouncement && (
         <div
           className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center"
@@ -777,7 +777,7 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
               </div>
 
               
-              {/* Comments Section */}
+
                <div className="comments-section">
         <h3 className="text-lg font-semibold mb-2">Comments</h3>
         {cError && <div className="text-red-600 text-sm mb-2">{cError}</div>}
@@ -810,7 +810,6 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
           </div>
         </div>
                           
-                            {/* Comments list */}
         {cLoading && <div className="text-sm">Loading…</div>}
         {!cLoading && rootComments.length === 0 && (
           <div className="text-sm text-gray-500">No comments yet.</div>
@@ -863,7 +862,8 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
             </div>
           ))}
         </div>
-        {/* Manual refresh if needed */}
+
+
         <div className="flex justify-end mt-3">
           <button
             className="text-xs underline"
@@ -899,7 +899,7 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
     <img
       src={URL.createObjectURL(announcementImage)}
       alt="Preview"
-      className="modal-img"   // ← palitan ito (wag na yung w-full h-full object-cover)
+      className="modal-img"  
     />
   ) : (
     <label className="upload-dropzone">
@@ -915,7 +915,7 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
 </div>
 
 
-      {/* Right = Form fields */}
+
       <div className="modal-form-fields">
         <h2 className="text-2xl font-bold text-green-700 mb-3">
           {editingAnnouncement ? "Update Announcement" : "Post Announcement"}
@@ -991,6 +991,7 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
             type="checkbox"
             checked={urgent}
             onChange={(e) => setUrgent(e.target.checked)}
+            className="w-4 h-4 align-middle"
           />
           <span>{urgent ? "❗ Urgent" : "Mark as Urgent"}</span>
         </label>
@@ -1031,10 +1032,7 @@ setError(err.response?.data?.error || err.response?.data?.message || err.message
   );
 }
 
-/** ─────────────────────────────────────────────────────────
- * NEW: small, reusable comment row component
- * Shows: name (role), time, text, heart, reply/edit/delete
- * ───────────────────────────────────────────────────────── */
+
 function CommentRow({
   c,
   onReply,
