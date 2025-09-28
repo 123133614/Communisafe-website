@@ -393,12 +393,18 @@ const chartData = {
       tension: 0.3,
       pointRadius: 0,
       fill: false,
-      // keep it simple; no scriptable here (those can silently break rendering)
-      borderColor: "#22c55e",
+      segment: {
+        borderColor: (ctx) => {
+          const y = ctx.p0.parsed.y;
+          if (y >= THRESH.high) return "red";
+          if (y >= THRESH.medium) return "orange";
+          if (y >= THRESH.low) return "blue";
+          return "green";
+        },
+      },
     },
   ],
 };
-
 const chartOptions = {
   responsive: true,
   animation: false,
