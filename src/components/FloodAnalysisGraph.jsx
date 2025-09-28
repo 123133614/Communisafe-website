@@ -191,7 +191,16 @@ useEffect(() => {
         borderWidth: 2,
         tension: 0.25,
         pointRadius: 0,
+      
+      segment: {
+        borderColor: (ctx) => {
+          const y = ctx.p0?.parsed?.y;
+          if (y <= THRESH.low) return "blue";
+          if (y <= THRESH.medium) return "orange";
+          return "red";
+        },
       },
+    },
       {
         label: "5-pt Moving Avg",
         data: sma(values, 5),
@@ -199,6 +208,7 @@ useEffect(() => {
         tension: 0.25,
         pointRadius: 0,
         borderDash: [6, 6],
+        borderColor: "gray",
       },
     ],
   };
