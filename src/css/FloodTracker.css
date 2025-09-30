@@ -459,14 +459,14 @@
 }
 
 .liq-pill-text {
-  font-weight: 700;
+  font-weight: 900;
   letter-spacing: 0.3px;
-  font-size: 12px;
+  font-size: 18px;
 }
 
 
 .liq-ft {
-  font-size: 28px;
+  font-size: 18px;
   font-weight: 800;
   color: #0f172a;
   text-shadow: 0 1px 0 rgba(255,255,255,0.6);
@@ -478,8 +478,46 @@
 }
 
 
-.wl-legend { font-size: 12px; color: #475569; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-.wl-pill { padding: 4px 8px; border-radius: 999px; border: 1px solid #e5e7eb; background: #fff; }
-.wl-low { color: #2563eb; border-color: #bfdbfe; background: #eff6ff; }
-.wl-med { color: #f59e0b; border-color: #fde68a; background: #fffbeb; }
-.wl-high { color: #dc2626; border-color: #fecaca; background: #fef2f2; }
+.wl-legend {
+  font-size: 12px;
+  color: #475569;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: nowrap;      
+  align-self: flex-end;   
+  justify-content: flex-end;
+  margin-left: auto;        
+  padding-right: 7px;    
+}
+
+.wl-legend > span {
+  white-space: nowrap;    
+}
+.wl-pill { 
+  padding: 4px 8px; 
+  border-radius: 999px; 
+  border: 1px solid #e5e7eb; 
+  background: #fff; 
+
+}
+.wl-low { 
+  color: #2563eb; 
+  border-color: #bfdbfe; 
+  background: #eff6ff; 
+}
+.wl-med { 
+  color: #f59e0b; 
+  border-color: #fde68a;
+  background: #fffbeb;
+  text-align: center;
+ }
+.wl-high { 
+  color: #dc2626; 
+  border-color: #fecaca; 
+  background: #fef2f2; 
+}
+@media (max-width: 400px) {
+  .wl-legend { gap: 4px; font-size: 11px; }
+  .wl-pill { padding: 2px 6px; }        
+}
