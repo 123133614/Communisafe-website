@@ -41,6 +41,11 @@ const getAuthHeaders = () => {
   const t = localStorage.getItem("token");
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
+// ---- Flood thresholds (single source of truth) ----
+const LOW_FT  = 1;
+const MED_FT  = 2;
+const HIGH_FT = 2.25;
+const EPS     = 0.001; // rounding tolerance
 
 
 const geojsonLineString = [
@@ -128,8 +133,6 @@ function LocationMarker({ setNewAlert, setShowModal, sensor }) {
   });
   return null;
 }
-
-// ⬇️ LiquidWaterGauge — circle with water fill + status pill
 function LiquidWaterGauge({
   valueCm = 0,
   lowFt = 1,
@@ -138,52 +141,54 @@ function LiquidWaterGauge({
   size = 240,
 }) {
   const valueFt = (Number(valueCm) || 0) / 30.48;
-  const maxFt = highFt;                          // water fill reaches top at high threshold
+  const maxFt = highFt;
   const pct = Math.max(0, Math.min(100, (valueFt / maxFt) * 100));
+  
+  
 
   // Status + colors
   let status = "NONE";
-  let color = "#9ca3af"; // gray
-  if (valueFt >= highFt) { status = "HIGH"; color = "#dc2626"; }       // red
-  else if (valueFt >= medFt) { status = "MEDIUM"; color = "#f59e0b"; } // orange
-  else if (valueFt >= lowFt) { status = "LOW"; color = "#2563eb"; }    // blue
+  let color = "#9ca3af";
+  if (valueFt >= highFt) { status = "HIGH"; color = "#dc2626"; }
+  else if (valueFt >= medFt) { status = "MEDIUM"; color = "#f59e0b"; }
+  else if (valueFt >= lowFt) { status = "LOW"; color = "#2563eb"; }
+
+  // 🔸 dynamic water gradients per status
+  const waterGradients = {
+    LOW:     ["#cfe9ff", "#78b9ff"],   // light → blue
+    MEDIUM:  ["#fde68a", "#f59e0b"],   // light → orange
+    HIGH:    ["#fecaca", "#ef4444"],   // light → red
+    NONE:    ["#e5e7eb", "#cbd5e1"],   // neutral (optional)
+  };
+  const [g1, g2] = waterGradients[status] || waterGradients.NONE;
 
   return (
     <div className="liq-wrap" style={{ width: size, height: size }}>
-      {/* outer ring */}
       <div className="liq-ring" />
 
-      {/* circle container (clips the water) */}
       <div className="liq-circle">
-        {/* water fill */}
+        {/* water fill with dynamic color */}
         <div
           className="liq-water"
           style={{
             height: `${pct}%`,
+            background: `linear-gradient(${g1}, ${g2})`,  
           }}
         >
-          {/* simple “wave” shimmer */}
           <div className="liq-wave" />
         </div>
-
-        {/* center content */}
+        
         <div className="liq-center">
-          {/* status pill (replaces percent text) */}
-          <div className="liq-pill">
-            <span className="liq-dot" style={{ background: color }} />
-            <span className="liq-pill-text" style={{ color }}>{status}</span>
-          </div>
-
-          {/* main value in ft (keep same as old gauge) */}
           <div className="liq-ft">{valueFt.toFixed(2)} ft</div>
-          <div className="liq-sub">Water Level</div>
-        </div>
-      </div>
-
-      {/* thresholds legend (same labels as before) */}
-      <div className="wl-legend" style={{ marginTop: 12 }}>
-        <span>Thresholds:&nbsp;</span>
-        <span className="wl-pill wl-low">1 ft (Low)</span>
+           <div className="liq-pill">
+             <span className="liq-dot" style={{ background: color }} />
+             <span className="liq-pill-text" style={{ color }}>{status}</span>
+            </div>
+             <div className="liq-sub">Water Level</div>
+              </div>
+             </div>
+             <div className="wl-legend" style={{ marginTop: 12 }}>
+              <span className="wl-pill wl-low">1 ft (Low)</span>
         <span className="wl-pill wl-med">2 ft (Medium)</span>
         <span className="wl-pill wl-high">3 ft (High)</span>
       </div>
@@ -192,13 +197,13 @@ function LiquidWaterGauge({
 }
 
 
+
 export default function FloodTracker() {
   const notify = useDesktopNotification();
   const navigate = useNavigate();
   const location = useLocation();
   const [view, setView] = useState("live");
 
-  // ─── Sidebar links (same order/icons as Visitor) ─────────────────────────
   const sidebarLinks = [
     {
       label: "Dashboard",
@@ -481,15 +486,20 @@ useEffect(() => {
     return "blue";
   };
 
- const waterLevelFt = sensor?.waterLevel ? sensor.waterLevel / 30.48 : 0;
+const waterLevelFt = (Number(sensor?.waterLevel) || 0) / 30.48;
 let floodLevel = "NONE";
-if (waterLevelFt >= 2.9) floodLevel = "HIGH";
-else if (waterLevelFt >= 2.0) floodLevel = "MEDIUM";
-else if (waterLevelFt >= 1.0) floodLevel = "LOW";
+if (waterLevelFt >= HIGH_FT - EPS) floodLevel = "HIGH";
+else if (waterLevelFt >= MED_FT - EPS) floodLevel = "MEDIUM";
+else if (waterLevelFt >= LOW_FT  - EPS) floodLevel = "LOW";
 
 
 
-const THRESH = { low: 30, medium: 60, high: 90 };
+const THRESH = {
+  low: LOW_FT * 30.48,
+  medium: MED_FT * 30.48,
+  high: HIGH_FT * 30.48,
+};
+
 const levelColor = (value) => {
   if (value >= THRESH.high) return "red";    
   if (value >= THRESH.medium) return "orange";  
@@ -716,12 +726,13 @@ const chartOptions = {
    <div className="lg:col-span-4">
   <div className="gauge-wrap rounded-2xl border border-green-100 bg-white">
     <LiquidWaterGauge
-      valueCm={sensor?.waterLevel || 0}
-      lowFt={1}
-      medFt={2}
-      highFt={3}
-      size={240}
-    />
+  valueCm={sensor?.waterLevel || 0}
+  lowFt={LOW_FT}
+  medFt={MED_FT}
+  highFt={HIGH_FT}
+  size={240}
+/>
+
   </div>
 </div>
 
