@@ -1,6 +1,3 @@
-/* src/css/FloodTracker.css */
-
-/* ─── Overall Container ─────────────────────────────────────────────────── */
 .flood-container {
   display: flex;
   min-height: 100vh;
@@ -8,7 +5,7 @@
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-/* ─── Sidebar Styles ────────────────────────────────────────────────────── */
+
 .appr-container{
   display:grid;
   grid-template-columns:280px 1fr;
@@ -42,9 +39,7 @@
 .appr-header h1{ margin:0; font-size:22px; font-weight:800; color:#2e7d32; }
 .appr-card{ background:#fff; border-radius:18px; box-shadow:0 2px 12px #0001; overflow:hidden; }
 
-/* Keep your existing flood styles for cards/legend/modals, but they now sit inside .appr-main */
 
-/* Responsive to collapse sidebar icons only */
 @media (max-width:980px){
   .appr-container{ grid-template-columns:80px 1fr; }
   .appr-sidebar-link span{ display:none; }
@@ -54,15 +49,16 @@
   .appr-header{ flex-direction:column; align-items:stretch; gap:10px; }
 }
 
-
-/* ─── Main Content Area ─────────────────────────────────────────────────── */
 .flood-main {
   display: flex;
-  .flood-main {
-  flex-direction: column; /* ← was row */
+.flood-main {
+  display: flex;
+  flex-direction: column;   
   gap: 2rem;
   margin-left: 16rem;
-  padding: 2rem;
+  padding: 2rem 2.5vw;
+  min-height: 100vh;
+  background: linear-gradient(135deg,#e6ffed 0%,#f3f4f6 100%);
 }
 
   gap: 2rem;
@@ -104,14 +100,13 @@
   margin-bottom: 1.5rem;
 }
 
-/* Section headers */
 .flood-main h2, .flood-main h3 {
   font-weight: 700;
   color: #16a34a;
   margin-bottom: 0.75rem;
 }
 
-/* ─── Map Wrapper ───────────────────────────────────────────────────────── */
+
 .map-wrapper {
   background-color: #ffffff;
   border-radius: 0.75rem;
@@ -121,7 +116,7 @@
   width: 100%;
 }
 
-/* ─── Legend for Map ────────────────────────────────────────────────────── */
+
 .legend {
   margin-top: 0.5rem;
 }
@@ -133,7 +128,6 @@
   border-radius: 9999px;
 }
 
-/* ─── Sensor Data Card ──────────────────────────────────────────────────── */
 .sensor-card {
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
@@ -142,7 +136,7 @@
   padding: 1rem;
 }
 
-/* ─── Recent Alerts Card ────────────────────────────────────────────────── */
+
 .alerts-card {
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
@@ -153,7 +147,7 @@
   overflow-y: auto;
 }
 
-/* ─── Single Alert Item ─────────────────────────────────────────────────── */
+
 .alert-item {
   background-color: #f9fafb;
   border-radius: 0.375rem;
@@ -164,7 +158,7 @@
   margin-top: 0.5rem;
 }
 
-/* ─── Emergency Contacts Card ───────────────────────────────────────────── */
+
 .contacts-card {
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
@@ -173,20 +167,20 @@
   padding: 1rem;
 }
 
-/* Contact Button */
+
 .contact-btn {
   display: block;
   text-align: center;
   font-weight: 600;
 }
 
-/* ─── “Report Flood” Button ────────────────────────────────────────────── */
+
 .report-btn {
   width: 100%;
   font-weight: 700;
 }
 
-/* ─── Modal Overlay ─────────────────────────────────────────────────────── */
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -197,7 +191,6 @@
   justify-content: center;
 }
 
-/* ─── Modal Content ────────────────────────────────────────────────────── */
 .modal-content {
   background: #fff;
   border-radius: 1.25rem;
@@ -208,19 +201,19 @@
   position: relative;
 }
 
-/* Flood Report Modal Specific */
+
 .flood-modal {
   border-top: 0.5rem solid #16a34a;
 }
 
-/* Modal Header */
+
 .modal-header {
   font-size: 1.25rem;
   font-weight: 700;
   margin-bottom: 1rem;
 }
 
-/* Disabled input styling */
+
 .input-disabled {
   width: 100%;
   padding: 0.5rem 0.75rem;
@@ -232,7 +225,7 @@
   text-align: left;
 }
 
-/* Enabled text input */
+
 .text-input {
   width: 100%;
   padding: 0.5rem 0.75rem;
@@ -241,7 +234,7 @@
   color: #374151;
 }
 
-/* Textarea styling */
+
 .textarea-input {
   width: 100%;
   min-height: 4rem;
@@ -251,7 +244,7 @@
   resize: vertical;
 }
 
-/* Bottom Buttons (Cancel / Submit) */
+
 .btn-cancel,
 .btn-submit {
   padding: 0.5rem 1rem;
@@ -312,7 +305,7 @@
   }
 }
 
-/* Add spacing between sections */
+
 .flood-page.modal-open {
   pointer-events: none;
   filter: brightness(0.6);
@@ -326,5 +319,167 @@
 .flood-page.modal-open .leaflet-container {
   filter: none !important;
   opacity: 1 !important;
-  pointer-events: none; /* optional: disable map clicking while modal open */
+  pointer-events: none; 
 }
+
+.chart-box {
+  height: 300px;
+}
+
+.gauge-wrap {
+  height: 300px;
+  display: flex;
+  align-items: center;         
+  justify-content: flex-start; 
+  padding-left: 8px;           
+}
+
+.wl-gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;   
+  gap: .75rem;
+  text-align: left;
+}
+
+.wl-circle {
+  border-radius: 9999px;
+  display: grid;
+  place-items: center;
+}
+.wl-inner {
+  background: #ffffff;
+  border-radius: 9999px;
+  box-shadow: inset 0 0 0 6px rgba(0,0,0,0.05);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 12px;
+}
+.wl-value { font-size: 1.8rem; font-weight: 800; color: #0f172a; line-height: 1.1; }
+.wl-sub   { font-size: .95rem; color: #64748b; margin-top: 2px; }
+.wl-pct   { font-size: .85rem; color: #94a3b8; margin-top: 2px; }
+
+.wl-legend {
+  justify-content: flex-start; 
+}
+
+.wl-pill {
+  padding: .2rem .55rem; border-radius: 9999px; background: #f1f5f9; font-weight: 600;
+}
+.wl-low  { color: #2563eb; background: rgba(37,99,235,.1); }
+.wl-med  { color: #f59e0b; background: rgba(245,158,11,.12); }
+.wl-high { color: #dc2626; background: rgba(220,38,38,.12); }
+
+
+@media (max-width: 768px) {
+  .chart-box, .gauge-wrap { height: 260px; }
+  .wl-value { font-size: 1.6rem; }
+}
+
+
+.liq-wrap {
+  position: relative;      
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+
+.liq-ring{
+  box-shadow: inset 0 0 0 8px rgba(191,219,254,.45);
+}
+
+.liq-circle {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: #f8fafc; /* light bg inside */
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.liq-water {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: linear-gradient(#cfe9ff, #78b9ff);
+  transition: height 500ms ease;
+  z-index: 1;  
+}
+
+
+.liq-wave {
+  position: absolute;
+  top: -10px;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: radial-gradient(50% 14px at 25% 100%, rgba(255,255,255,0.9) 30%, rgba(255,255,255,0) 31%) repeat-x;
+  background-size: 40px 20px;
+  opacity: 0.6;
+  animation: liq-wave-move 3s linear infinite;
+}
+@keyframes liq-wave-move {
+  from { background-position-x: 0; }
+  to   { background-position-x: 40px; }
+}
+
+.liq-center{
+  position: absolute;                  
+  inset: 0;                               
+  display: grid;                          
+  place-items: center;
+  gap: 6px;
+  text-align: center;
+  pointer-events: none;
+  z-index: 2;                            
+  align-content: start;                 
+  padding-top: 28px;                      
+}
+
+.liq-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(241, 245, 249, 0.85);
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  backdrop-filter: blur(2px);
+  margin-bottom: 2px;
+}
+
+.liq-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.liq-pill-text {
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  font-size: 12px;
+}
+
+
+.liq-ft {
+  font-size: 28px;
+  font-weight: 800;
+  color: #0f172a;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.6);
+}
+
+.liq-sub {
+  font-size: 12px;
+  color: #475569;
+}
+
+
+.wl-legend { font-size: 12px; color: #475569; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.wl-pill { padding: 4px 8px; border-radius: 999px; border: 1px solid #e5e7eb; background: #fff; }
+.wl-low { color: #2563eb; border-color: #bfdbfe; background: #eff6ff; }
+.wl-med { color: #f59e0b; border-color: #fde68a; background: #fffbeb; }
+.wl-high { color: #dc2626; border-color: #fecaca; background: #fef2f2; }
