@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { io } from "socket.io-client";
 import useDesktopNotification from "../hooks/useDesktopNotification";
-
+// src/components/FloodTracker.jsx
 import FloodReadingsTable from "./FloodReadingsTable"; 
 import FloodReportsTable from "./FloodReportsTable";
 import FloodAnalysisGraph from "../components/FloodAnalysisGraph";
@@ -128,6 +128,69 @@ function LocationMarker({ setNewAlert, setShowModal, sensor }) {
   });
   return null;
 }
+
+// ⬇️ LiquidWaterGauge — circle with water fill + status pill
+function LiquidWaterGauge({
+  valueCm = 0,
+  lowFt = 1,
+  medFt = 2,
+  highFt = 3,
+  size = 240,
+}) {
+  const valueFt = (Number(valueCm) || 0) / 30.48;
+  const maxFt = highFt;                          // water fill reaches top at high threshold
+  const pct = Math.max(0, Math.min(100, (valueFt / maxFt) * 100));
+
+  // Status + colors
+  let status = "NONE";
+  let color = "#9ca3af"; // gray
+  if (valueFt >= highFt) { status = "HIGH"; color = "#dc2626"; }       // red
+  else if (valueFt >= medFt) { status = "MEDIUM"; color = "#f59e0b"; } // orange
+  else if (valueFt >= lowFt) { status = "LOW"; color = "#2563eb"; }    // blue
+
+  return (
+    <div className="liq-wrap" style={{ width: size, height: size }}>
+      {/* outer ring */}
+      <div className="liq-ring" />
+
+      {/* circle container (clips the water) */}
+      <div className="liq-circle">
+        {/* water fill */}
+        <div
+          className="liq-water"
+          style={{
+            height: `${pct}%`,
+          }}
+        >
+          {/* simple “wave” shimmer */}
+          <div className="liq-wave" />
+        </div>
+
+        {/* center content */}
+        <div className="liq-center">
+          {/* status pill (replaces percent text) */}
+          <div className="liq-pill">
+            <span className="liq-dot" style={{ background: color }} />
+            <span className="liq-pill-text" style={{ color }}>{status}</span>
+          </div>
+
+          {/* main value in ft (keep same as old gauge) */}
+          <div className="liq-ft">{valueFt.toFixed(2)} ft</div>
+          <div className="liq-sub">Water Level</div>
+        </div>
+      </div>
+
+      {/* thresholds legend (same labels as before) */}
+      <div className="wl-legend" style={{ marginTop: 12 }}>
+        <span>Thresholds:&nbsp;</span>
+        <span className="wl-pill wl-low">1 ft (Low)</span>
+        <span className="wl-pill wl-med">2 ft (Medium)</span>
+        <span className="wl-pill wl-high">3 ft (High)</span>
+      </div>
+    </div>
+  );
+}
+
 
 export default function FloodTracker() {
   const notify = useDesktopNotification();
@@ -284,6 +347,30 @@ useEffect(() => {
   })();
 }, []); // run once
 
+useEffect(() => {
+  if (!sensor?._id) return;
+
+  const saveReading = async () => {
+    try {
+      await axios.post(`${API_URL}/api/flood/save-reading`, 
+        { sensorId: sensor._id }, 
+        { headers: getAuthHeaders() }
+      );
+      console.log("✅ Flood reading saved");
+    } catch (err) {
+      console.error("❌ Save reading failed:", err);
+    }
+  };
+
+  // call once immediately
+  saveReading();
+
+  // repeat every 15 mins
+  const interval = setInterval(saveReading, 15 * 60 * 1000);
+
+  return () => clearInterval(interval);
+}, [sensor?._id]);
+
 
 
 
@@ -298,7 +385,7 @@ useEffect(() => {
 
  const socket = io(API_URL, {
   path: "/socket.io/",
-  transports: ["websocket", "polling"], 
+  transports: ["polling", "websocket"],
   withCredentials: true,
 });
 
@@ -333,6 +420,34 @@ socket.on("flood_reading_created", (payload) => {
   };
 }, [sensor?._id]);
 
+// Poll every 15 minutes (900000 ms)
+useEffect(() => {
+  if (!sensor?._id) return;
+
+  const fetchLatest = async () => {
+    try {
+      const rRes = await axios.get(
+        `${API_URL}/api/flood/readings?sensorId=${sensor._id}&limit=1&sort=desc`,
+        { headers: getAuthHeaders() }
+      );
+      const item = Array.isArray(rRes.data) ? rRes.data[0] : rRes.data?.items?.[0];
+      if (item) {
+        pushPoint(Number(item.waterLevel || 0), item.recordedAt || item.createdAt || Date.now());
+        setSensor((prev) => ({ ...(prev || {}), ...item }));
+      }
+    } catch (e) {
+      console.error("❌ Polling failed:", e);
+    }
+  };
+
+  // run immediately once
+  fetchLatest();
+
+  // run every 15 min
+  const interval = setInterval(fetchLatest, 15 * 60 * 1000);
+
+  return () => clearInterval(interval);
+}, [sensor?._id]);
 
   // Submit flood report
   const handleReportSubmit = async (e) => {
@@ -405,6 +520,7 @@ const chartData = {
     },
   ],
 };
+
 const chartOptions = {
   responsive: true,
   animation: false,
@@ -580,22 +696,41 @@ const chartOptions = {
       </div>
     </section>
 
-    
-    <section className="appr-card" style={{ padding: 16, marginTop: 16 }}>
-      <h3 className="font-semibold text-gray-700 mb-2">Real-Time Water Level</h3>
-      <div
-        className="rounded-2xl overflow-hidden border border-green-100 bg-white"
-        style={{ height: 300 }}
-      >
-        {/* Real-time Chart */}
-       {!sensor ? (
-  <div className="p-4 text-gray-500">No sensor configured yet.</div>
-) : (
-  <Line key={labels.length} data={chartData} options={chartOptions} />
-)}
+    {/* Real-Time Water Level (chart + gauge side-by-side) */}
+<section className="appr-card" style={{ padding: 16, marginTop: 16 }}>
+  <h3 className="font-semibold text-gray-700 mb-2">Real-Time Water Level</h3>
 
+  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+    {/* Left: Line chart */}
+    <div className="lg:col-span-8">
+      <div className="chart-box rounded-2xl overflow-hidden border border-green-100 bg-white">
+        {!sensor ? (
+          <div className="p-4 text-gray-500">No sensor configured yet.</div>
+        ) : (
+          <Line key={labels.length} data={chartData} options={chartOptions} />
+        )}
       </div>
-    </section>
+    </div>
+
+   {/* Right: Gauge */}
+   <div className="lg:col-span-4">
+  <div className="gauge-wrap rounded-2xl border border-green-100 bg-white">
+    <LiquidWaterGauge
+      valueCm={sensor?.waterLevel || 0}
+      lowFt={1}
+      medFt={2}
+      highFt={3}
+      size={240}
+    />
+  </div>
+</div>
+
+  </div>
+</section>
+
+
+
+   
 
     {/* Sensor Data Card */}
     <section className="appr-card" style={{ padding: 16, marginTop: 16 }}>
